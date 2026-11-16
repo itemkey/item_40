@@ -5,6 +5,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from .domain import result_stem
 from .paths import default_output_dir
 
 
@@ -38,7 +39,7 @@ def save_result(store, job_id: str) -> Path | None:
         if destination is None:
             directory = output_directory(store)
             directory.mkdir(parents=True, exist_ok=True)
-            stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", Path(job["source"]).stem).strip(" .")[:160] or "audio"
+            stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", result_stem(job)).strip(" .")[:160] or "audio"
             if stem.split(".")[0].upper() in {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
                                               *(f"LPT{i}" for i in range(1, 10))}:
                 stem = "_" + stem

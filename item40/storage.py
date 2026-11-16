@@ -43,11 +43,36 @@ class Store:
             self.connection.execute("INSERT OR REPLACE INTO settings VALUES (?,?)", (key, json.dumps(value)))
 
     def add(self, request: JobRequest):
-        stamp = now()
         with self.connection:
-            self.connection.execute("""INSERT INTO jobs
+            self._insert(request)
+
+    def _insert(self, request: JobRequest):
+        stamp = now()
+        self.connection.execute("""INSERT INTO jobs
                 (id,tool_id,source,options,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?)""",
                 (request.id, request.tool_id, request.source, json.dumps(asdict(request)), "queued", stamp, stamp))
+
+    def combine_sources(self, request: JobRequest, job_ids: list[str]):
+        with self.connection:
+            rows = [self.get(job_id) for job_id in job_ids]
+            if not rows or any(not row or row["status"] == "running" for row in rows):
+                raise ValueError("Один из файлов уже обрабатывается. Дождитесь завершения.")
+            self._insert(request)
+            for row in rows:
+                if row["status"] == "queued" and not row["transcript"]:
+                    self.connection.execute("DELETE FROM jobs WHERE id=?", (row["id"],))
+                else:
+                    self.connection.execute("UPDATE jobs SET in_sources=0 WHERE id=?", (row["id"],))
+
+    def reorder_sources(self, job_id, paths):
+        row = self.get(job_id)
+        if not row or row["status"] != "queued":
+            raise ValueError("Порядок можно менять до запуска задачи.")
+        options = json.loads(row["options"])
+        options.update(source=paths[0], source_files=list(paths))
+        with self.connection:
+            self.connection.execute("UPDATE jobs SET source=?, options=?, updated_at=? WHERE id=?",
+                                    (paths[0], json.dumps(options), now(), job_id))
 
     def update(self, job_id: str, **values):
         allowed = {"status", "progress", "stage", "transcript", "segments", "edited", "error",
@@ -85,7 +110,7 @@ class Store:
 
     def source_jobs(self):
         return [dict(row) for row in self.connection.execute(
-            "SELECT * FROM jobs WHERE in_sources=1 ORDER BY created_at DESC")]
+            "SELECT * FROM jobs WHERE in_sources=1 ORDER BY created_at")]
 
     def hide_source(self, job_id):
         with self.connection:

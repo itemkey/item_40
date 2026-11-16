@@ -49,6 +49,15 @@ class JobManager(QObject):
         self.enabled = True
         self._next()
 
+    def combine_sources(self, job_ids, paths, model, language, device):
+        if len(paths) < 2:
+            raise ValueError("Выберите хотя бы два файла.")
+        request = JobRequest(source=paths[0], source_files=list(paths), model=model,
+                             language=language, device=device)
+        self.store.combine_sources(request, job_ids)
+        self.changed.emit(request.id)
+        return request.id
+
     def pause(self):
         self.enabled = False
 

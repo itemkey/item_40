@@ -136,3 +136,54 @@ def test_output_directory_setting_and_save_dialog(qtbot, tmp_path, monkeypatch):
     page.export()
     assert dialog.call_args.args[2] == str(target / "meeting.txt")
     window.close()
+
+
+def test_combination_uses_selected_order_and_creates_one_editor_job(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from item40.domain import job_files
+    window = make_window(qtbot, tmp_path)
+    page = window.tool_views["audio.transcribe"]
+    paths = [tmp_path / "first.m4a", tmp_path / "second.flac"]
+    for path in paths:
+        path.write_bytes(b"original")
+    page.add_files([str(path) for path in paths])
+    assert len(page.list.selectedItems()) == 2
+    assert page.combine_button.isEnabled()
+
+    class ReversedOrder:
+        def __init__(self, files, *args, **kwargs):
+            self.files = list(reversed(files))
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+        def paths(self):
+            return self.files
+
+    monkeypatch.setattr("item40.ui.audio_page.FileOrderDialog", ReversedOrder)
+    QTest.mouseClick(page.combine_button, Qt.MouseButton.LeftButton)
+    assert page.list.count() == 1
+    group = window.store.get(page.selected_id)
+    assert job_files(group) == [str(paths[1]), str(paths[0])]
+    assert len(window.store.pending()) == 1
+    assert len(window.store.jobs()) == 1
+    page.edit_order(group["id"])
+    assert job_files(window.store.get(group["id"])) == [str(path) for path in paths]
+    assert all(path.read_bytes() == b"original" for path in paths)
+    window.close()
+
+
+def test_order_dialog_up_and_down(qtbot):
+    from item40.ui.file_order import FileOrderDialog
+    dialog = FileOrderDialog(["first.m4a", "second.wav", "third.flac"])
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.list.setCurrentRow(2)
+    QTest.mouseClick(dialog.up, Qt.MouseButton.LeftButton)
+    QTest.mouseClick(dialog.up, Qt.MouseButton.LeftButton)
+    assert dialog.paths() == ["third.flac", "first.m4a", "second.wav"]
+    assert not dialog.up.isEnabled()
+    QTest.mouseClick(dialog.down, Qt.MouseButton.LeftButton)
+    assert dialog.paths() == ["first.m4a", "third.flac", "second.wav"]
+    dialog.close()

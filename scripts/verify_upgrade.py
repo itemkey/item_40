@@ -25,6 +25,8 @@ def execute(args, *, timeout=180):
 def main():
     import winreg
     sys.stdout.reconfigure(encoding="utf8")
+    sys.path.insert(0, str(ROOT))
+    from item40 import __version__ as current_version
     compiler = Path(sys.argv[1]).resolve()
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     old_exe = ROOT / "dist" / "Masterskaya" / "Masterskaya.exe"
@@ -74,15 +76,15 @@ Source: "{old_exe}"; DestDir: "{{app}}"; Flags: ignoreversion
         assert (old_dir / "Masterskaya.exe").exists()
         # No /DIR is passed here: the updated installer must reuse the previous path.
         execute([ARTIFACTS / "update.exe", *silent])
-        assert installed_version() == "0.2.0"
+        assert installed_version() == current_version
         assert (old_dir / "item-40.exe").is_file()
         assert not (old_dir / "Masterskaya.exe").exists()
         assert not (new_default / "item-40.exe").exists()
         assert all(hashlib.sha256(path.read_bytes()).hexdigest() == value for path, value in hashes.items())
-        report = {"from": "0.1.0", "to": "0.2.0", "same_directory": True,
+        report = {"from": "0.1.0", "to": current_version, "same_directory": True,
                   "old_executable_removed": True, "history_and_models_preserved": True}
         (ARTIFACTS / "report.json").write_text(json.dumps(report, indent=2), encoding="utf8")
-        print("Upgrade 0.1.0 -> 0.2.0: PASS", flush=True)
+        print(f"Upgrade 0.1.0 -> {current_version}: PASS", flush=True)
     finally:
         # Only uninstall our dedicated test AppId from paths under the workspace.
         for folder in (old_dir, new_default):

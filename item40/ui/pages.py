@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__
-from ..domain import MODEL_LABELS, STATUS_LABELS
+from ..domain import MODEL_LABELS, STATUS_LABELS, job_files, source_label
 from ..exports import output_directory
 from .theme import icon
 from .widgets import button, heading, label, panel
@@ -113,10 +113,10 @@ class JobsPage(QWidget):
         for job in self.context.store.jobs():
             if self.history and job["status"] in {"queued", "running"}:
                 continue
-            if query not in Path(job["source"]).name.casefold():
+            if not any(query in Path(source).name.casefold() for source in job_files(job)):
                 continue
             date = datetime.fromisoformat(job["created_at"]).astimezone().strftime("%d.%m.%Y  %H:%M")
-            item = QListWidgetItem(f"{Path(job['source']).name}\n{STATUS_LABELS[job['status']]}  ·  {date}")
+            item = QListWidgetItem(f"{source_label(job)}\n{STATUS_LABELS[job['status']]}  ·  {date}")
             item.setData(Qt.ItemDataRole.UserRole, job["id"])
             item.setIcon(icon("check" if job["status"] == "completed" else "file"))
             item.setToolTip(job["stage"])

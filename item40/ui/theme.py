@@ -36,8 +36,8 @@ def icon(name, color="#aaaaaa", size=20):
 
 STYLE = """
 * { font-family: 'Segoe UI'; font-size: 13px; color: #dedede; border-radius: 0px; }
-QMainWindow, QWidget#root { background: #171717; }
 QWidget { background: transparent; }
+QMainWindow, QDialog, QWidget#root { background: #171717; }
 QFrame#sidebar { background: #121212; border-right: 1px solid #343434; }
 QFrame#panel, QFrame#card { background: #1b1b1b; border: 1px solid #383838; }
 QFrame#inset { background: #171717; border: 1px solid #383838; }

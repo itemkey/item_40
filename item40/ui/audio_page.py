@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QLocale, Qt, QTimer
+from PySide6.QtCore import QItemSelectionModel, QLocale, Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -24,8 +25,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..domain import AUDIO_FILTER, MODEL_LABELS, STATUS_LABELS
+from ..domain import AUDIO_FILTER, MODEL_LABELS, STATUS_LABELS, job_files, result_stem, source_label
 from ..exports import output_directory, save_result, write_text_atomic
+from .file_order import FileOrderDialog
 from .theme import icon
 from .widgets import DropZone, button, heading, label, panel
 
@@ -109,12 +111,19 @@ class AudioPage(QWidget):
         language_column.addWidget(self.language)
         options.addLayout(language_column, 1)
         input_layout.addLayout(options)
+        group_controls = QHBoxLayout()
+        self.combine_button = button("Объединить…", callback=self.combine_selected)
+        self.combine_button.setToolTip("Одна расшифровка для выбранных файлов. Ctrl+A — выбрать все.")
+        group_controls.addWidget(self.combine_button)
+        group_controls.addStretch()
+        input_layout.addLayout(group_controls)
         self.list = QListWidget()
         self.list.setMinimumHeight(60)
         self.list.setSpacing(1)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.list.currentItemChanged.connect(self.selection_changed)
         self.list.itemSelectionChanged.connect(self.update_remove_button)
+        self.list.itemDoubleClicked.connect(lambda item: self.edit_order(item.data(Qt.ItemDataRole.UserRole)))
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self.source_menu)
         remove_action = QAction(self.list)
@@ -206,7 +215,13 @@ class AudioPage(QWidget):
         ids = self.manager.enqueue(paths, self.quality.currentData(), self.language.currentData(),
                                    self.store.setting("device", "auto"))
         self.refresh()
-        self.select(ids[0])
+        self.list.clearSelection()
+        self.list.setCurrentItem(self.items[ids[0]], QItemSelectionModel.SelectionFlag.NoUpdate)
+        for job_id in ids:
+            self.items[job_id].setSelected(True)
+        self.selected_id = ids[0]
+        self.update_result()
+        self.update_remove_button()
 
     def start(self):
         if not self.store.pending():
@@ -222,12 +237,56 @@ class AudioPage(QWidget):
             self.manager.cancel(self.selected_id)
 
     def update_remove_button(self):
-        self.remove_button.setEnabled(bool(self.list.selectedItems()))
+        items = self.list.selectedItems()
+        self.remove_button.setEnabled(bool(items))
+        jobs = [self.store.get(item.data(Qt.ItemDataRole.UserRole)) for item in items]
+        self.combine_button.setEnabled(bool(jobs) and all(job and job["status"] != "running" for job in jobs)
+                                       and sum(len(job_files(job)) for job in jobs if job) >= 2)
+
+    def combine_selected(self):
+        ids = [item.data(Qt.ItemDataRole.UserRole) for item in self.list.selectedItems()]
+        jobs = [self.store.get(job_id) for job_id in ids]
+        if not jobs or any(not job or job["status"] == "running" for job in jobs):
+            return
+        paths = [path for job in jobs for path in job_files(job)]
+        if len(paths) < 2:
+            return
+        dialog = FileOrderDialog(paths, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.flush_edit()
+            try:
+                job_id = self.manager.combine_sources(ids, dialog.paths(), self.quality.currentData(),
+                    self.language.currentData(), self.store.setting("device", "auto"))
+            except ValueError as error:
+                self.context.show_error("Не удалось объединить", str(error))
+                return
+            self.refresh()
+            self.select(job_id)
+
+    def edit_order(self, job_id):
+        job = self.store.get(job_id)
+        if not job or len(job_files(job)) < 2:
+            return
+        editable = job["status"] == "queued"
+        dialog = FileOrderDialog(job_files(job), self, editable=editable, accept_text="Сохранить")
+        if dialog.exec() == QDialog.DialogCode.Accepted and editable:
+            try:
+                self.store.reorder_sources(job_id, dialog.paths())
+            except ValueError as error:
+                self.context.show_error("Порядок файлов", str(error))
+                return
+            self.refresh(job_id)
 
     def source_menu(self, position):
         if not self.list.selectedItems():
             return
         menu = QMenu(self)
+        current = self.list.currentItem()
+        if current:
+            job_id = current.data(Qt.ItemDataRole.UserRole)
+            job = self.store.get(job_id)
+            if job and len(job_files(job)) > 1:
+                menu.addAction("Порядок файлов…", lambda: self.edit_order(job_id))
         menu.addAction("Убрать из списка", self.remove_selected)
         menu.exec(self.list.viewport().mapToGlobal(position))
 
@@ -280,16 +339,16 @@ class AudioPage(QWidget):
                 item = QListWidgetItem()
                 item.setData(Qt.ItemDataRole.UserRole, job["id"])
                 self.items[job["id"]] = item
-                self.list.insertItem(0, item)
+                self.list.addItem(item)
             percent = f" · {job['progress']:.0%}" if job["status"] == "running" else ""
-            item.setText(f"{Path(job['source']).name}\n{STATUS_LABELS[job['status']]}{percent}")
+            item.setText(f"{source_label(job)}\n{STATUS_LABELS[job['status']]}{percent}")
             item.setIcon(icon("check" if job["status"] == "completed" else "audio",
                               "#aaaaaa"))
-            item.setToolTip(job["source"] + "\n" + job["stage"])
+            item.setToolTip("\n".join(job_files(job)) + "\n" + job["stage"])
         self.list.blockSignals(False)
         pending = len(self.store.pending())
         active = self.store.get(self.manager.active) if self.manager.active and not self.manager.download_only else None
-        self.queue_count.setText(f"{pending} в очереди" if pending else f"{len(jobs)} файлов")
+        self.queue_count.setText(f"Файлов: {sum(len(job_files(job)) for job in jobs)}")
         self.empty_queue.setVisible(not jobs)
         self.list.setVisible(bool(jobs))
         self.update_remove_button()
@@ -311,8 +370,8 @@ class AudioPage(QWidget):
     def update_result(self):
         job = self.store.get(self.selected_id) if self.selected_id else None
         text = job["transcript"] if job else ""
-        self.filename.setText(Path(job["source"]).name if job else "")
-        self.filename.setToolTip(job["source"] if job else "")
+        self.filename.setText(source_label(job) if job else "")
+        self.filename.setToolTip("\n".join(job_files(job)) if job else "")
         if not self.dirty and self.editor.toPlainText() != text:
             scroll = self.editor.verticalScrollBar()
             at_bottom = scroll.value() >= scroll.maximum() - 12
@@ -369,7 +428,7 @@ class AudioPage(QWidget):
             return
         job = self.store.get(self.selected_id)
         path, _ = QFileDialog.getSaveFileName(self, "Сохранить текст",
-                                             str(output_directory(self.store) / (Path(job["source"]).stem + ".txt")),
+                                             str(output_directory(self.store) / (result_stem(job) + ".txt")),
                                              "Текст UTF-8 (*.txt)")
         if path:
             try:

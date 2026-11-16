@@ -48,13 +48,21 @@ def run_job(request: JobRequest, root: str, events, cancel):
         events.put({"kind": kind, "data": data})
 
     try:
-        from .audio import iter_audio_chunks, owned_segments, probe_audio
+        from .audio import SAMPLE_RATE, iter_audio_chunks, owned_segments, probe_audio
 
         data = Path(root)
         data.mkdir(parents=True, exist_ok=True)
         logging.basicConfig(filename=data / "worker.log", encoding="utf-8", level=logging.INFO)
         download_only = request.tool_id == "models.download"
-        duration = None if download_only else probe_audio(request.source)
+        files = request.files
+        durations = []
+        if not download_only:
+            for source in files:
+                check_cancel(cancel)
+                try:
+                    durations.append(probe_audio(source))
+                except ValueError as error:
+                    raise ValueError(f"{Path(source).name}: {error}") from error
         model_dir = ensure_model(request.model, data, emit, cancel)
         if download_only:
             emit("completed", download_only=True)
@@ -94,20 +102,40 @@ def run_job(request: JobRequest, root: str, events, cancel):
             emit("notice", message="Не удалось запустить GPU. Продолжаем на процессоре.")
             kwargs.update(device="cpu", compute_type="int8")
             model = WhisperModel(str(model_dir), **kwargs)
-        language = request.language
-        for chunk in iter_audio_chunks(request.source, cancel):
-            check_cancel(cancel)
-            emit("progress", stage=f"Распознавание · {'NVIDIA GPU' if device == 'cuda' else 'процессор'}",
-                 progress=min(0.99, chunk.owned_start / duration) if duration else 0)
-            segments, info = recognize_chunk(model, chunk.samples, language, request.model)
-            if language is None and info.duration_after_vad > 0:
-                language = info.language
-                emit("language", language=language)
-            for segment in owned_segments(segments, chunk):
+        total_duration = sum(durations) if all(durations) else None
+        offset = 0.0
+        processed_duration = 0.0
+        last_progress = 0.0
+        for source_index, (source, duration) in enumerate(zip(files, durations)):
+            language = request.language
+            decoded_duration = 0.0
+            stage = (f"{source_index + 1}/{len(files)} · {Path(source).name}" if len(files) > 1 else
+                     f"Распознавание · {'NVIDIA GPU' if device == 'cuda' else 'процессор'}")
+
+            def progress(local_time):
+                nonlocal last_progress
+                value = ((processed_duration + local_time) / total_duration if total_duration else
+                         (source_index + min(1, local_time / duration) if duration else source_index) / len(files))
+                last_progress = max(last_progress, min(0.99, value))
+                emit("progress", stage=stage, progress=last_progress)
+
+            for chunk in iter_audio_chunks(source, cancel):
                 check_cancel(cancel)
-                emit("segment", segment=segment)
-                emit("progress", stage=f"Распознавание · {'NVIDIA GPU' if device == 'cuda' else 'процессор'}",
-                     progress=min(0.99, segment["end"] / duration) if duration else 0)
+                decoded_duration = max(decoded_duration, chunk.offset + len(chunk.samples) / SAMPLE_RATE)
+                progress(chunk.owned_start)
+                segments, info = recognize_chunk(model, chunk.samples, language, request.model)
+                if language is None and info.duration_after_vad > 0:
+                    language = info.language
+                    emit("language", language=language)
+                for segment in owned_segments(segments, chunk):
+                    check_cancel(cancel)
+                    local_end = segment["end"]
+                    segment.update(start=segment["start"] + offset, end=segment["end"] + offset,
+                                   source_index=source_index)
+                    emit("segment", segment=segment)
+                    progress(local_end)
+            offset += decoded_duration
+            processed_duration += duration or decoded_duration
         check_cancel(cancel)
         emit("completed", language=language, device=device)
     except Cancelled:

@@ -70,3 +70,16 @@ def test_existing_external_file_is_not_overwritten(tmp_path):
     assert save_result(store, job_id) == tmp_path / "audio_2.txt"
     assert existing.read_text(encoding="utf8") == "Keep this"
     store.close()
+
+
+def test_group_creates_one_combined_text_file(tmp_path):
+    store = Store(tmp_path / "store.sqlite3")
+    store.set_setting("output_dir", str(tmp_path / "out"))
+    request = JobRequest(source="second.m4a", source_files=["second.m4a", "first.wav"])
+    store.add(request)
+    store.update(request.id, status="completed", transcript="Вторая запись.\n\nПервая запись.")
+    output = save_result(store, request.id)
+    assert output.name == "second_объединено.txt"
+    assert output.read_text(encoding="utf8") == "Вторая запись.\n\nПервая запись."
+    assert len(list((tmp_path / "out").glob("*.txt"))) == 1
+    store.close()
