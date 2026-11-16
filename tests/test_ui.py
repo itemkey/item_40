@@ -187,3 +187,123 @@ def test_order_dialog_up_and_down(qtbot):
     QTest.mouseClick(dialog.down, Qt.MouseButton.LeftButton)
     assert dialog.paths() == ["first.m4a", "third.flac", "second.wav"]
     dialog.close()
+
+
+def streaming_page(qtbot, tmp_path):
+    window = make_window(qtbot, tmp_path)
+    page = window.tool_views["audio.transcribe"]
+    job = JobRequest(source="stream.m4a")
+    window.store.add(job)
+    text = "\n".join(f"Строка {number}: текст расшифровки." for number in range(180))
+    window.store.update(job.id, status="running", transcript=text)
+    page.refresh()
+    page.select(job.id)
+    qtbot.waitUntil(lambda: page.editor.verticalScrollBar().maximum() > 50)
+    return window, page, job, text
+
+
+def test_stream_follows_bottom_pauses_above_it_and_resumes(qtbot, tmp_path):
+    window, page, job, text = streaming_page(qtbot, tmp_path)
+    scroll = page.editor.verticalScrollBar()
+    scroll.setValue(scroll.maximum())
+    text += "\n" + "\n".join(f"Новая строка {number}." for number in range(40))
+    window.store.update(job.id, transcript=text)
+    page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == scroll.maximum()
+
+    # Moving only one line away from the end must already stop following.
+    scroll.setValue(scroll.maximum() - 1)
+    reading_position = scroll.value()
+    text += "\n" + "\n".join(f"Продолжение {number}." for number in range(40))
+    window.store.update(job.id, transcript=text)
+    page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == reading_position
+
+    scroll.setValue(scroll.maximum())
+    text += "\nПоследний фрагмент.\nЕщё одна строка."
+    window.store.update(job.id, transcript=text)
+    page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == scroll.maximum()
+    window.close()
+
+
+def test_stream_preserves_reading_position_and_selection(qtbot, tmp_path):
+    from PySide6.QtGui import QTextCursor
+    window, page, job, text = streaming_page(qtbot, tmp_path)
+    cursor = page.editor.textCursor()
+    cursor.setPosition(20)
+    cursor.setPosition(45, QTextCursor.MoveMode.KeepAnchor)
+    page.editor.setTextCursor(cursor)
+    selected = page.editor.textCursor().selectedText()
+    scroll = page.editor.verticalScrollBar()
+    scroll.setValue(scroll.maximum() // 3)
+    position = scroll.value()
+    window.store.update(job.id, transcript=text + "\nСледующий фрагмент. " * 30)
+    page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == position
+    assert page.editor.textCursor().selectedText() == selected
+    window.close()
+
+
+def test_user_scroll_cancels_a_pending_follow_update(qtbot, tmp_path):
+    window, page, job, text = streaming_page(qtbot, tmp_path)
+    scroll = page.editor.verticalScrollBar()
+    scroll.setValue(scroll.maximum())
+    window.store.update(job.id, transcript=text + "\nДополнение." * 30)
+    page.refresh(job.id)
+    scroll.setValue(scroll.maximum() // 2)
+    position = scroll.value()
+    qtbot.wait(50)
+    assert scroll.value() == position
+    window.close()
+
+
+def test_first_streamed_text_follows_after_editor_becomes_visible(qtbot, tmp_path):
+    window, page, job, text = streaming_page(qtbot, tmp_path)
+    qtbot.wait(50)
+    scroll = page.editor.verticalScrollBar()
+    assert scroll.value() == scroll.maximum()
+    window.close()
+
+
+def test_wrapped_stream_and_rapid_updates_keep_the_chosen_scroll_mode(qtbot, tmp_path):
+    window, page, job, _ = streaming_page(qtbot, tmp_path)
+    text = "Текст без разрывов строк. " * 1200
+    window.store.update(job.id, transcript=text)
+    page.refresh(job.id)
+    qtbot.wait(50)
+    scroll = page.editor.verticalScrollBar()
+    scroll.setValue(scroll.maximum() - 1)
+    position = scroll.value()
+    for _ in range(3):
+        text += "Продолжение фразы. " * 100
+        window.store.update(job.id, transcript=text)
+        page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == position
+    scroll.setValue(scroll.maximum())
+    for _ in range(3):
+        text += "Ещё текст. " * 100
+        window.store.update(job.id, transcript=text)
+        page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == scroll.maximum()
+    window.close()
+
+
+def test_restarted_transcription_follows_from_empty_text(qtbot, tmp_path):
+    window, page, job, text = streaming_page(qtbot, tmp_path)
+    scroll = page.editor.verticalScrollBar()
+    scroll.setValue(scroll.maximum() // 2)
+    window.store.update(job.id, transcript="")
+    page.refresh(job.id)
+    qtbot.wait(20)
+    window.store.update(job.id, transcript=text)
+    page.refresh(job.id)
+    qtbot.wait(50)
+    assert scroll.value() == scroll.maximum()
+    window.close()

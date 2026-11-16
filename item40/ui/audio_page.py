@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QPlainTextEdit,
     QProgressBar,
     QScrollArea,
     QSplitter,
@@ -29,6 +28,7 @@ from ..domain import AUDIO_FILTER, MODEL_LABELS, STATUS_LABELS, job_files, resul
 from ..exports import output_directory, save_result, write_text_atomic
 from .file_order import FileOrderDialog
 from .theme import icon
+from .transcript_editor import TranscriptEditor
 from .widgets import DropZone, button, heading, label, panel
 
 
@@ -181,7 +181,7 @@ class AudioPage(QWidget):
         placeholder_layout.addWidget(self.empty_hint)
         placeholder_layout.addStretch()
         self.result_stack.addWidget(placeholder)
-        self.editor = QPlainTextEdit()
+        self.editor = TranscriptEditor()
         self.editor.setTabChangesFocus(True)
         self.editor.textChanged.connect(self.on_edit)
         self.result_stack.addWidget(self.editor)
@@ -372,14 +372,8 @@ class AudioPage(QWidget):
         text = job["transcript"] if job else ""
         self.filename.setText(source_label(job) if job else "")
         self.filename.setToolTip("\n".join(job_files(job)) if job else "")
-        if not self.dirty and self.editor.toPlainText() != text:
-            scroll = self.editor.verticalScrollBar()
-            at_bottom = scroll.value() >= scroll.maximum() - 12
-            previous = scroll.value()
-            self.editor.blockSignals(True)
-            self.editor.setPlainText(text)
-            self.editor.blockSignals(False)
-            scroll.setValue(scroll.maximum() if at_bottom else previous)
+        if not self.dirty:
+            self.editor.set_snapshot(text, self.selected_id)
         running = bool(job and job["status"] in {"queued", "running"})
         self.editor.setReadOnly(not job or running)
         self.result_stack.setCurrentIndex(1 if text or (job and not running) else 0)
