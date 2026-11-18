@@ -15,6 +15,11 @@ item-40 использует компоненты, распространяем�
 | NumPy | [BSD-3-Clause](https://github.com/numpy/numpy/blob/main/LICENSE.txt) |
 | Hugging Face Hub / Tokenizers | [Apache-2.0](https://github.com/huggingface/huggingface_hub/blob/main/LICENSE) |
 | Requests | [Apache-2.0](https://github.com/psf/requests/blob/main/LICENSE) |
+| yt-dlp для Windows | [GPLv3+ для исполняемого файла](https://github.com/yt-dlp/yt-dlp#licensing) |
+| Deno | [MIT и лицензии зависимостей](https://github.com/denoland/deno/blob/v2.9.8/LICENSE.md) |
+| FFmpeg для скачивания и конвертации | [GPL, сборка Gyan](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2) |
+
+yt-dlp, Deno и отдельная сборка FFmpeg загружаются из исходных релизов при первом использовании инструмента YouTube. Версии и SHA‑256 закреплены в `item40/youtube_tools.py`.
 
 GPU-библиотеки NVIDIA не включены в установщик. Приложение отдельно скачивает неизменённые официальные Windows wheels с PyPI и извлекает DLL и лицензии в пользовательский каталог. На них распространяются условия NVIDIA; тексты лицензий сохраняются рядом с библиотеками. Требуется совместимый драйвер NVIDIA.
 

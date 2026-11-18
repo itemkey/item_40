@@ -6,6 +6,7 @@ from item40.jobs import JobManager
 from item40.storage import Store
 from item40.ui.theme import STYLE
 from item40.ui.window import MainWindow
+from item40.youtube import TOOL_ID, Stream, Video
 
 
 def make_window(qtbot, tmp_path):
@@ -47,6 +48,34 @@ def test_catalog_navigation_and_no_results(qtbot, tmp_path):
     assert not window.catalog.no_results.isVisible()
     window.open_tool("audio.transcribe")
     assert window.stack.currentWidget() is window.tool_views["audio.transcribe"]
+    window.close()
+
+
+def test_youtube_cancel_and_send_completed_file_to_transcription(qtbot, tmp_path, monkeypatch):
+    window = make_window(qtbot, tmp_path)
+    window.open_tool(TOOL_ID)
+    page = window.tool_views[TOOL_ID]
+    page.directory.setText(str(tmp_path))
+    page.load_formats(Video("Тест", 5, [Stream("18", "mp4", "avc1", "aac", 640, 360, 30, 500, None)]), [])
+    monkeypatch.setattr(page, "start_task", lambda request: None)
+
+    page.start_download()
+    cancelled_folder = page.work_dir
+    partial = cancelled_folder / "source.mp4.part"
+    partial.write_bytes(b"partial file")
+    page.finish("cancelled")
+    assert not cancelled_folder.exists()
+    assert page.result is None
+
+    page.start_download()
+    incoming = page.work_dir / "output.mp4"
+    incoming.write_bytes(b"complete file")
+    page.finish("downloaded", source=incoming, readable_audio=True)
+    assert page.result == tmp_path / "Тест.mp4"
+    assert not page.transcribe_button.isHidden()
+    QTest.mouseClick(page.transcribe_button, Qt.MouseButton.LeftButton)
+    assert window.stack.currentWidget() is window.tool_views["audio.transcribe"]
+    assert window.store.pending()[0]["source"] == str(page.result)
     window.close()
 
 

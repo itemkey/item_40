@@ -13,6 +13,8 @@ def smoke_test(request_path, report_path):
     from .storage import Store
 
     request = json.loads(Path(request_path).read_text(encoding="utf-8-sig"))
+    if "youtube_url" in request:
+        return youtube_smoke_test(request, report_path)
     app = QCoreApplication([])
     with tempfile.TemporaryDirectory() as temp:
         store = Store(Path(temp) / "smoke.sqlite3")
@@ -50,3 +52,72 @@ def smoke_test(request_path, report_path):
         timer.start()
         manager.start()
         return app.exec()
+
+
+def youtube_smoke_test(request, report_path):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+
+    from .jobs import JobManager
+    from .paths import data_dir, database_path
+    from .storage import Store
+    from .ui.window import MainWindow
+    from .youtube import TOOL_ID
+
+    app = QApplication([])
+    root = data_dir()
+    store = Store(database_path(root))
+    window = MainWindow(store, JobManager(store, root), root)
+    window.open_tool(TOOL_ID)
+    page = window.tool_views[TOOL_ID]
+    page.directory.setText(request["directory"])
+    page.link.setText(request["youtube_url"])
+    started = time.monotonic()
+    downloads = []
+    steps = ["MP3", "MP4", "WMA"]
+    current = None
+    page.lookup()
+
+    def finish(error=""):
+        report = {"error": error, "downloads": downloads}
+        Path(report_path).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        timer.stop()
+        window.close()
+        app.exit(1 if error else 0)
+
+    def check():
+        nonlocal current
+        if time.monotonic() - started > request.get("timeout_seconds", 300):
+            finish(f"Timeout: {page.status.text()}")
+            return
+        if page.process is not None:
+            return
+        if page.video is None or (current and (page.result is None or page.transcribe_button.isHidden())):
+            finish(f"{page.status.text()} {page.status.toolTip()}".strip())
+            return
+        if current:
+            downloads.append({"format": current, "path": str(page.result), "bytes": page.result.stat().st_size})
+        if not steps:
+            finish()
+            return
+        current = steps.pop(0)
+        if current == "MP3":
+            page.kind.setCurrentIndex(1)
+            page.format.setCurrentText(current)
+        elif current == "MP4":
+            page.kind.setCurrentIndex(0)
+            page.format.setCurrentText(current)
+            page.quality.setCurrentIndex(max(0, page.quality.findData(360)))
+        else:
+            page.advanced.setChecked(True)
+            page.advanced_kind.setCurrentIndex(1)
+            index = next((i for i in range(page.muxer.count()) if page.muxer.itemData(i).name == "asf"), -1)
+            page.muxer.setCurrentIndex(index)
+            page.video_codec.setCurrentIndex(0)
+            page.audio_codec.setCurrentText("wmav2")
+        page.start_download()
+
+    timer = QTimer()
+    timer.timeout.connect(check)
+    timer.start(150)
+    return app.exec()
