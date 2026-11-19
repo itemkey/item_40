@@ -13,6 +13,10 @@ def smoke_test(request_path, report_path):
     from .storage import Store
 
     request = json.loads(Path(request_path).read_text(encoding="utf-8-sig"))
+    if "telegram_pack_url" in request:
+        from .telegram_diagnostics import smoke_test as telegram_smoke_test
+
+        return telegram_smoke_test(request, report_path)
     if "youtube_url" in request:
         return youtube_smoke_test(request, report_path)
     app = QCoreApplication([])

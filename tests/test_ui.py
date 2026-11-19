@@ -4,6 +4,8 @@ from PySide6.QtTest import QTest
 from item40.domain import JobRequest
 from item40.jobs import JobManager
 from item40.storage import Store
+from item40.telegram import TOOL_ID as TELEGRAM_TOOL_ID
+from item40.telegram import Emoji, EmojiPack
 from item40.ui.theme import STYLE
 from item40.ui.window import MainWindow
 from item40.youtube import TOOL_ID, Stream, Video
@@ -76,6 +78,46 @@ def test_youtube_cancel_and_send_completed_file_to_transcription(qtbot, tmp_path
     QTest.mouseClick(page.transcribe_button, Qt.MouseButton.LeftButton)
     assert window.stack.currentWidget() is window.tool_views["audio.transcribe"]
     assert window.store.pending()[0]["source"] == str(page.result)
+    window.close()
+
+
+def test_telegram_selection_partial_download_retry_and_cancel(qtbot, tmp_path, monkeypatch):
+    window = make_window(qtbot, tmp_path)
+    window.open_tool(TELEGRAM_TOOL_ID)
+    page = window.tool_views[TELEGRAM_TOOL_ID]
+    page.token, page.username = "123456:TEST_ONLY_TOKEN", "test_bot"
+    page.update_connection()
+    emojis = [Emoji(str(i), i, f"file-{i}", "webp", "😀", 12, None) for i in (1, 2, 3)]
+    page.load_pack(EmojiPack("TestEmoji", "Тест", emojis))
+    page.directory.setText(str(tmp_path))
+
+    def start_task(action, params, token=None):
+        page.action = action
+
+    monkeypatch.setattr(page, "start_task", start_task)
+    page.items["1"].setSelected(True)
+    page.items["3"].setSelected(True)
+    assert page.selected_count.text() == "Выбрано 2 из 3"
+    page.download_selected()
+    assert [emoji.id for emoji in page.requested] == ["1", "3"]
+    result = page.output_folder / "001_1.webp"
+    result.write_bytes(b"original")
+    page.handle_event("saved", {"id": "1", "path": result})
+    page.handle_event("file_failed", {"id": "3", "error": "Недоступно"})
+    page.finish("completed")
+    assert not page.retry_button.isHidden()
+    assert not page.open_button.isHidden()
+    page.retry_failed()
+    assert [emoji.id for emoji in page.requested] == ["3"]
+    partial_folder = page.work_dir
+    (partial_folder / "3.part").write_bytes(b"partial")
+    page.finish("cancelled")
+    assert not partial_folder.exists()
+    assert result.read_bytes() == b"original"
+    assert page.failed == {"3": "Загрузка прервана."}
+    page.link.setText("t.me/addemoji/AnotherPack")
+    assert page.pack is None
+    assert page.grid.count() == 0
     window.close()
 
 

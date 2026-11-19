@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..registry import builtin_tools
+from ..telegram import TOOL_ID as TELEGRAM_TOOL_ID
 from ..youtube import TOOL_ID
 from .pages import CatalogPage, JobsPage, SettingsPage
 from .theme import icon
@@ -155,6 +156,8 @@ class MainWindow(QMainWindow):
         self.tool_views["audio.transcribe"].flush_edit()
         if TOOL_ID in self.tool_views:
             self.tool_views[TOOL_ID].shutdown()
+        if TELEGRAM_TOOL_ID in self.tool_views:
+            self.tool_views[TELEGRAM_TOOL_ID].shutdown()
         self.manager.shutdown()
         self.store.close()
         event.accept()
