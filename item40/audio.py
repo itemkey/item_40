@@ -7,6 +7,7 @@ import av
 import numpy as np
 
 from .downloads import check_cancel
+from .i18n import tr
 
 SAMPLE_RATE = 16000
 CORE_SECONDS = 120
@@ -23,17 +24,17 @@ class AudioChunk:
 
 def probe_audio(path: str) -> float | None:
     if not Path(path).is_file():
-        raise ValueError("Файл не найден. Возможно, его переместили или удалили.")
+        raise ValueError(tr('Файл не найден. Возможно, его переместили или удалили.'))
     try:
         with av.open(path) as container:
             if not container.streams.audio:
-                raise ValueError("В файле нет аудиодорожки.")
+                raise ValueError(tr('В файле нет аудиодорожки.'))
             stream = container.streams.audio[0]
             duration = (float(stream.duration * stream.time_base) if stream.duration is not None
                         else container.duration / av.time_base if container.duration else None)
             return duration if duration and duration > 0 else None
     except av.error.FFmpegError as error:
-        raise ValueError("Не удалось прочитать аудио: файл повреждён, защищён или имеет неподдерживаемый кодек.") from error
+        raise ValueError(tr('Не удалось прочитать аудио: файл повреждён, защищён или имеет неподдерживаемый кодек.')) from error
 
 
 def iter_audio_chunks(path: str, cancel, core_seconds: float = CORE_SECONDS,

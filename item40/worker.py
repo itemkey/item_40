@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .domain import JobRequest
 from .downloads import Cancelled, check_cancel, ensure_gpu, ensure_model
+from .i18n import tr
 
 _dll_handles = []
 
@@ -70,7 +71,7 @@ def run_job(request: JobRequest, root: str, events, cancel):
 
         device = "cuda" if request.device != "cpu" and nvidia_gpu() else "cpu"
         if request.device == "cuda" and device != "cuda":
-            raise ValueError("NVIDIA GPU не найдена. Выберите «Процессор» или «Автоматически».")
+            raise ValueError(tr('NVIDIA GPU не найдена. Выберите «Процессор» или «Автоматически».'))
         if device == "cuda":
             try:
                 gpu_dir = ensure_gpu(data, emit, cancel)
@@ -84,10 +85,10 @@ def run_job(request: JobRequest, root: str, events, cancel):
                     raise
                 logging.exception("GPU setup failed, using CPU")
                 device = "cpu"
-                emit("notice", message="Ускорение GPU недоступно. Продолжаем на процессоре.")
+                emit("notice", message=tr('Ускорение GPU недоступно. Продолжаем на процессоре.'))
 
         check_cancel(cancel)
-        emit("progress", stage="Загрузка модели в память", progress=0)
+        emit("progress", stage=tr('Загрузка модели в память'), progress=0)
         from faster_whisper import WhisperModel
 
         kwargs = {"device": device, "compute_type": "float16" if device == "cuda" else "int8",
@@ -99,7 +100,7 @@ def run_job(request: JobRequest, root: str, events, cancel):
                 raise
             logging.exception("GPU initialization failed, using CPU")
             device = "cpu"
-            emit("notice", message="Не удалось запустить GPU. Продолжаем на процессоре.")
+            emit("notice", message=tr('Не удалось запустить GPU. Продолжаем на процессоре.'))
             kwargs.update(device="cpu", compute_type="int8")
             model = WhisperModel(str(model_dir), **kwargs)
         total_duration = sum(durations) if all(durations) else None
@@ -110,7 +111,7 @@ def run_job(request: JobRequest, root: str, events, cancel):
             language = request.language
             decoded_duration = 0.0
             stage = (f"{source_index + 1}/{len(files)} · {Path(source).name}" if len(files) > 1 else
-                     f"Распознавание · {'NVIDIA GPU' if device == 'cuda' else 'процессор'}")
+                     tr('Распознавание · {0}', 'NVIDIA GPU' if device == 'cuda' else 'процессор'))
 
             def progress(local_time):
                 nonlocal last_progress
@@ -144,5 +145,5 @@ def run_job(request: JobRequest, root: str, events, cancel):
         logging.exception("Transcription failed")
         message = str(error)
         if any(term in message.lower() for term in ("connection", "resolve", "https", "offline", "timeout")):
-            message = "Не удалось скачать компоненты. Проверьте интернет и повторите попытку. Загрузка продолжится."
+            message = tr('Не удалось скачать компоненты. Проверьте интернет и повторите попытку. Загрузка продолжится.')
         emit("failed", error=message or type(error).__name__)

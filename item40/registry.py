@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Callable
 
+from .i18n import tr
+
 
 @dataclass(frozen=True)
 class ToolDefinition:
@@ -13,18 +15,27 @@ class ToolDefinition:
 
 
 def builtin_tools():
+    from .converters import TOOL_ID as CONVERTER_TOOL_ID
+    from .soundcloud import TOOL_ID as SOUNDCLOUD_TOOL_ID
     from .telegram import TOOL_ID as TELEGRAM_TOOL_ID
     from .ui.audio_page import AudioPage
+    from .ui.converter_page import ConverterPage
+    from .ui.soundcloud_page import SoundCloudPage
     from .ui.telegram_page import TelegramPage
     from .ui.youtube_page import YouTubePage
     from .youtube import TOOL_ID
 
-    return [ToolDefinition("audio.transcribe", "Аудио → текст", "Аудио",
-                           "Распознавание аудио в текст.",
+    return [ToolDefinition("audio.transcribe", tr('Аудио → текст'), tr('Аудио'),
+                           tr('Распознавание аудио в текст.'),
                            "audio", AudioPage),
-            ToolDefinition(TOOL_ID, "Скачать с YouTube", "YouTube",
-                           "Сохранение видео и аудио по ссылке.",
+            ToolDefinition(TOOL_ID, tr('Скачать с YouTube'), "YouTube",
+                           tr('Сохранение видео и аудио по ссылке.'),
                            "save", YouTubePage),
-            ToolDefinition(TELEGRAM_TOOL_ID, "Скачать эмодзи", "Telegram",
-                           "Выбор и скачивание оригинальных эмодзи из пака по ссылке.",
-                           "save", TelegramPage)]
+            ToolDefinition(TELEGRAM_TOOL_ID, tr('Скачать эмодзи'), "Telegram",
+                           tr('Выбор и скачивание оригинальных эмодзи из пака по ссылке.'),
+                           "save", TelegramPage),
+            ToolDefinition(CONVERTER_TOOL_ID, tr('Конвертеры файлов'), tr('Конвертеры'),
+                           tr('Аудио, видео, изображения, документы, PDF, книги, архивы и субтитры.'),
+                           "refresh", ConverterPage),
+            ToolDefinition(SOUNDCLOUD_TOOL_ID, tr('Скачать с SoundCloud'), "SoundCloud",
+                           tr('Треки и выбранные песни из плейлистов и альбомов.'), "save", SoundCloudPage)]

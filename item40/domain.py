@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .i18n import language, tr
+
 AUDIO_EXTENSIONS = (".m4a", ".mp3", ".wav", ".flac", ".aac", ".ogg", ".opus", ".wma", ".aiff", ".aif",
                     ".amr", ".m4b", ".caf", ".mp4", ".webm", ".mkv", ".mov")
-AUDIO_FILTER = "Аудио и видео (" + " ".join("*" + ext for ext in AUDIO_EXTENSIONS) + ");;Все файлы (*)"
+AUDIO_FILTER = tr('Аудио и видео (') + " ".join("*" + ext for ext in AUDIO_EXTENSIONS) + tr(');;Все файлы (*)')
 MODEL_REPOS = {"small": "Systran/faster-whisper-small", "large-v3": "Systran/faster-whisper-large-v3"}
-MODEL_LABELS = {"small": "Быстро · small", "large-v3": "Точно · large-v3"}
-STATUS_LABELS = {"queued": "В очереди", "running": "Обработка", "completed": "Готово",
-                 "cancelled": "Отменено", "failed": "Ошибка", "interrupted": "Прервано"}
+MODEL_LABELS = {"small": tr('Быстро · small'), "large-v3": tr('Точно · large-v3')}
+STATUS_LABELS = {"queued": tr('В очереди'), "running": tr('Обработка'), "completed": tr('Готово'),
+                 "cancelled": tr('Отменено'), "failed": tr('Ошибка'), "interrupted": tr('Прервано')}
 
 
 def now() -> str:
@@ -43,8 +45,10 @@ def source_label(job: dict) -> str:
     files = job_files(job)
     first = Path(files[0]).name
     count = len(files)
-    ending = "файл" if count % 10 == 1 and count % 100 != 11 else (
-        "файла" if count % 10 in (2, 3, 4) and count % 100 not in (12, 13, 14) else "файлов")
+    if language() == "en":
+        return first if count == 1 else f"{count} files · {first}"
+    ending = tr('файл') if count % 10 == 1 and count % 100 != 11 else (
+        tr('файла') if count % 10 in (2, 3, 4) and count % 100 not in (12, 13, 14) else tr('файлов'))
     return first if count == 1 else f"{count} {ending} · {first}"
 
 

@@ -6,13 +6,20 @@ from pathlib import Path
 
 
 def smoke_test(request_path, report_path):
+    request = json.loads(Path(request_path).read_text(encoding="utf-8-sig"))
+    if "conversion_files" in request or "soundcloud_url" in request:
+        from .i18n import selected_language, set_language
+
+        set_language(request.get("ui_language", selected_language()))
+        from .conversion_diagnostics import smoke_test as conversion_smoke_test
+
+        return conversion_smoke_test(request, report_path)
     from PySide6.QtCore import QCoreApplication, QTimer
 
     from .jobs import JobManager
     from .paths import data_dir
     from .storage import Store
 
-    request = json.loads(Path(request_path).read_text(encoding="utf-8-sig"))
     if "telegram_pack_url" in request:
         from .telegram_diagnostics import smoke_test as telegram_smoke_test
 

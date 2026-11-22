@@ -1,0 +1,62 @@
+{
+  "7zip": {
+    "filename": "7z2606-x64.exe",
+    "version": "26.06",
+    "executable": "7z.exe",
+    "kind": "7zip",
+    "url": "https://github.com/ip7z/7zip/releases/download/26.06/7z2606-x64.exe",
+    "sha256": "9b697f65ecc2d9b0152f5ee96d72dde522a7827690349d9307935dacf40f42ec",
+    "bootstrap_url": "https://github.com/ip7z/7zip/releases/download/26.06/7zr.exe",
+    "bootstrap_sha256": "e80db2dad715a6c5adabe292d31ed54e11f4e9b99ca349827b50573b175891bc"
+  },
+  "imagemagick": {
+    "filename": "ImageMagick-7.1.2-36-x64.7z",
+    "version": "7.1.2-36",
+    "executable": "magick.exe",
+    "kind": "7z",
+    "url": "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-36/ImageMagick-7.1.2-36-portable-Q16-x64.7z",
+    "sha256": "1d8f948f7ed789a74f69bf3dedc60c3935bbef69f283406cee01d35868c6d971"
+  },
+  "pandoc": {
+    "filename": "pandoc-3.14.zip",
+    "version": "3.14",
+    "executable": "pandoc.exe",
+    "kind": "zip",
+    "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-windows-x86_64.zip",
+    "sha256": "0144b96e8c7b023fd382ec5ef5bdc475e873f1019d6fa72502492df2c9a94a3b"
+  },
+  "calibre": {
+    "filename": "calibre-9.19.0.exe",
+    "version": "9.19.0",
+    "executable": "ebook-convert.exe",
+    "kind": "calibre",
+    "url": "https://github.com/kovidgoyal/calibre/releases/download/v9.19.0/calibre-portable-installer-9.19.0.exe",
+    "sha256": "785d9255ea7841c0ee1fcd13cb975a7ec04eadee8b2f1a5cbf97da77605aeded"
+  },
+  "libreoffice": {
+    "filename": "LibreOffice-26.8.3.msi",
+    "version": "26.8.3",
+    "executable": "soffice.com",
+    "kind": "msi",
+    "url": "https://download.documentfoundation.org/libreoffice/stable/26.8.3/win/x86_64/LibreOffice_26.8.3_Win_x86-64.msi",
+    "sha256": "0e6918c273eabbdbbd800ee0dacbbf130a14c13c2e4cec861b06dd59e015bf94"
+  },
+  "tesseract": {
+    "filename": "tesseract-5.5.3.exe",
+    "version": "5.5.3",
+    "executable": "tesseract.exe",
+    "kind": "nsis",
+    "url": "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe",
+    "sha256": "bee9e3434bd94fd65387d9be28cd467a41f61b1275383b55b0f59a1331270ae4",
+    "languages": {
+      "eng": {
+        "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/eng.traineddata",
+        "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+      },
+      "rus": {
+        "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/rus.traineddata",
+        "sha256": "e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225"
+      }
+    }
+  }
+}

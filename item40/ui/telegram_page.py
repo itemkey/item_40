@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..telegram import pack_name, thumbnail_cache, worker
 from ..telegram_credentials import forget_connection, load_connection, save_connection
 from .widgets import button, heading, label, panel
@@ -55,27 +56,27 @@ class TelegramPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
-        layout.addWidget(heading("Скачать эмодзи", "Выберите эмодзи из пака Telegram и сохраните оригиналы."))
+        layout.addWidget(heading(tr('Скачать эмодзи'), tr('Выберите эмодзи из пака Telegram и сохраните оригиналы.')))
         self.connection, connection_layout = panel()
         self.connected_row = QWidget()
         connected_layout = QHBoxLayout(self.connected_row)
         connected_layout.setContentsMargins(0, 0, 0, 0)
         self.bot_label = label("", "sectionTitle")
         connected_layout.addWidget(self.bot_label, 1)
-        connected_layout.addWidget(button("Сменить бота", callback=self.change_bot))
+        connected_layout.addWidget(button(tr('Сменить бота'), callback=self.change_bot))
         connection_layout.addWidget(self.connected_row)
         self.credentials = QWidget()
         credentials_layout = QVBoxLayout(self.credentials)
         credentials_layout.setContentsMargins(0, 0, 0, 0)
-        credentials_layout.addWidget(label("Создайте бота командой /newbot в @BotFather и вставьте его токен.",
+        credentials_layout.addWidget(label(tr('Создайте бота командой /newbot в @BotFather и вставьте его токен.'),
                                            "muted", True))
         row = QHBoxLayout()
-        self.token_input = QLineEdit(placeholderText="Токен бота из @BotFather")
-        self.token_input.setAccessibleName("Токен бота Telegram")
+        self.token_input = QLineEdit(placeholderText=tr('Токен бота из @BotFather'))
+        self.token_input.setAccessibleName(tr('Токен бота Telegram'))
         self.token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.token_input.returnPressed.connect(self.connect_bot)
         row.addWidget(self.token_input, 1)
-        row.addWidget(button("Подключить бота", callback=self.connect_bot))
+        row.addWidget(button(tr('Подключить бота'), callback=self.connect_bot))
         credentials_layout.addLayout(row)
         connection_layout.addWidget(self.credentials)
         layout.addWidget(self.connection)
@@ -83,11 +84,11 @@ class TelegramPage(QWidget):
         self.link_controls = QWidget()
         links = QHBoxLayout(self.link_controls)
         links.setContentsMargins(0, 0, 0, 0)
-        self.link = QLineEdit(placeholderText="https://t.me/addemoji/НазваниеПака")
-        self.link.setAccessibleName("Ссылка на эмодзи-пак")
+        self.link = QLineEdit(placeholderText=tr('https://t.me/addemoji/НазваниеПака'))
+        self.link.setAccessibleName(tr('Ссылка на эмодзи-пак'))
         self.link.returnPressed.connect(self.lookup)
         self.link.textChanged.connect(self.reset_pack)
-        self.lookup_button = button("Загрузить пак", "search", callback=self.lookup)
+        self.lookup_button = button(tr('Загрузить пак'), "search", callback=self.lookup)
         links.addWidget(self.link, 1)
         links.addWidget(self.lookup_button)
         layout.addWidget(self.link_controls)
@@ -98,13 +99,13 @@ class TelegramPage(QWidget):
         title_row = QHBoxLayout()
         self.pack_title = label("", "sectionTitle", True)
         title_row.addWidget(self.pack_title, 1)
-        self.select_all = button("Выбрать все", callback=lambda: self.grid.selectAll())
-        self.select_none = button("Снять выделение", callback=lambda: self.grid.clearSelection())
+        self.select_all = button(tr('Выбрать все'), callback=lambda: self.grid.selectAll())
+        self.select_none = button(tr('Снять выделение'), callback=lambda: self.grid.clearSelection())
         title_row.addWidget(self.select_all)
         title_row.addWidget(self.select_none)
         pack_layout.addLayout(title_row)
         self.grid = QListWidget()
-        self.grid.setAccessibleName("Эмодзи пака. Щёлкните для выбора или снятия выделения.")
+        self.grid.setAccessibleName(tr('Эмодзи пака. Щёлкните для выбора или снятия выделения.'))
         self.grid.setViewMode(QListView.ViewMode.IconMode)
         self.grid.setResizeMode(QListView.ResizeMode.Adjust)
         self.grid.setMovement(QListView.Movement.Static)
@@ -121,18 +122,20 @@ class TelegramPage(QWidget):
         downloads = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
         directory = context.store.setting("telegram_download_dir", downloads or str(Path.home() / "Downloads"))
         self.directory = QLineEdit(directory, readOnly=True)
-        self.directory.setAccessibleName("Папка для эмодзи")
+        self.directory.setAccessibleName(tr('Папка для эмодзи'))
         folder_row.addWidget(self.directory, 1)
-        self.choose_folder_button = button("Выбрать папку…", "folder", callback=self.choose_folder)
+        self.choose_folder_button = button(tr('Выбрать папку…'), "folder", callback=self.choose_folder)
         folder_row.addWidget(self.choose_folder_button)
         pack_layout.addLayout(folder_row)
         actions = QHBoxLayout()
-        self.download_button = button("Скачать выбранные", "save", True, self.download_selected)
-        self.retry_button = button("Повторить неудачные", "refresh", callback=self.retry_failed)
-        self.open_button = button("Открыть папку", "folder", callback=self.open_folder)
+        self.download_button = button(tr('Скачать выбранные'), "save", True, self.download_selected)
+        self.retry_button = button(tr('Повторить неудачные'), "refresh", callback=self.retry_failed)
+        self.open_button = button(tr('Открыть папку'), "folder", callback=self.open_folder)
+        self.convert_button = button(tr('Конвертировать'), "refresh", callback=self.convert_saved)
         actions.addWidget(self.download_button)
         actions.addWidget(self.retry_button)
         actions.addWidget(self.open_button)
+        actions.addWidget(self.convert_button)
         actions.addStretch()
         pack_layout.addLayout(actions)
         layout.addWidget(self.pack_controls, 1)
@@ -140,7 +143,7 @@ class TelegramPage(QWidget):
         layout.addWidget(self.status)
         self.progress = QProgressBar(textVisible=False)
         layout.addWidget(self.progress)
-        self.cancel_button = button("Отменить", "stop", callback=self.cancel)
+        self.cancel_button = button(tr('Отменить'), "stop", callback=self.cancel)
         layout.addWidget(self.cancel_button)
         layout.addStretch()
         self.reset_pack()
@@ -156,7 +159,7 @@ class TelegramPage(QWidget):
     def update_connection(self):
         self.connected_row.setVisible(bool(self.token))
         self.credentials.setVisible(not self.token)
-        self.bot_label.setText(f"Подключён @{self.username}")
+        self.bot_label.setText(tr('Подключён @{0}', self.username))
         self.link_controls.setEnabled(bool(self.token) and self.process is None)
 
     def change_bot(self):
@@ -165,7 +168,7 @@ class TelegramPage(QWidget):
         try:
             forget_connection(self.context.root)
         except OSError:
-            self.status.setText("Не удалось удалить сохранённое подключение. Проверьте доступ к папке данных.")
+            self.status.setText(tr('Не удалось удалить сохранённое подключение. Проверьте доступ к папке данных.'))
             return
         self.token = self.username = ""
         self.token_input.clear()
@@ -178,7 +181,7 @@ class TelegramPage(QWidget):
             return
         self.pending_token = self.token_input.text().strip()
         if not self.pending_token:
-            self.status.setText("Вставьте токен бота из @BotFather.")
+            self.status.setText(tr('Вставьте токен бота из @BotFather.'))
             return
         self.reset_pack()
         self.start_task("connect", {}, self.pending_token)
@@ -193,6 +196,7 @@ class TelegramPage(QWidget):
         self.pack_controls.hide()
         self.retry_button.hide()
         self.open_button.hide()
+        self.convert_button.hide()
         self.saved = {}
         self.failed = {}
         self.status.clear()
@@ -210,7 +214,7 @@ class TelegramPage(QWidget):
 
     def load_pack(self, pack):
         self.pack = pack
-        self.pack_title.setText(f"{pack.title} · {len(pack.emojis)} эмодзи")
+        self.pack_title.setText(tr('{0} · {1} эмодзи', pack.title, len(pack.emojis)))
         self.grid.clear()
         self.items = {}
         for emoji in pack.emojis:
@@ -240,13 +244,13 @@ class TelegramPage(QWidget):
 
     def update_selection(self):
         count = len(self.grid.selectedItems())
-        self.selected_count.setText(f"Выбрано {count} из {len(self.items)}")
+        self.selected_count.setText(tr('Выбрано {0} из {1}', count, len(self.items)))
         can_download = self.process is None or self.action == "inspect" and self.pack is not None
         self.download_button.setEnabled(count > 0 and can_download and bool(self.token)
                                         and self.pending_download is None)
 
     def choose_folder(self):
-        directory = QFileDialog.getExistingDirectory(self, "Куда сохранить эмодзи", self.directory.text())
+        directory = QFileDialog.getExistingDirectory(self, tr('Куда сохранить эмодзи'), self.directory.text())
         if directory:
             self.directory.setText(directory)
             self.context.store.set_setting("telegram_download_dir", directory)
@@ -272,7 +276,7 @@ class TelegramPage(QWidget):
             self.output_folder.mkdir(parents=True, exist_ok=True)
             self.work_dir = Path(tempfile.mkdtemp(prefix=".item40-telegram-", dir=self.output_folder))
         except OSError:
-            self.status.setText("Не удалось подготовить папку для сохранения. Выберите другую папку.")
+            self.status.setText(tr('Не удалось подготовить папку для сохранения. Выберите другую папку.'))
             self.update_selection()
             return
         if reset:
@@ -285,8 +289,8 @@ class TelegramPage(QWidget):
 
     def start_task(self, action, params, token=None):
         self.action = action
-        self.status.setText({"connect": "Подключение бота…", "inspect": "Получение эмодзи-пака…",
-                             "download": "Скачивание эмодзи…"}[action])
+        self.status.setText({"connect": tr('Подключение бота…'), "inspect": tr('Получение эмодзи-пака…'),
+                             "download": tr('Скачивание эмодзи…')}[action])
         self.events = self.mp.Queue()
         self.cancel_event = self.mp.Event()
         self.process = self.mp.Process(target=worker, args=(self.context.root, token or self.token, action,
@@ -295,7 +299,7 @@ class TelegramPage(QWidget):
         try:
             self.process.start()
         except (OSError, RuntimeError):
-            self.finish("failed", error="Не удалось запустить операцию Telegram. Повторите попытку.")
+            self.finish("failed", error=tr('Не удалось запустить операцию Telegram. Повторите попытку.'))
             return
         self.timer.start()
 
@@ -316,13 +320,13 @@ class TelegramPage(QWidget):
         if self.process is not None and self.cancel_time is None:
             self.cancel_event.set()
             self.cancel_time = time.monotonic()
-            self.status.setText("Отмена…")
+            self.status.setText(tr('Отмена…'))
             self.cancel_button.setEnabled(False)
 
     def handle_event(self, kind, values):
         if kind == "pack":
             self.load_pack(values["pack"])
-            self.status.setText("Загрузка миниатюр…")
+            self.status.setText(tr('Загрузка миниатюр…'))
         elif kind == "thumbnail":
             self.show_thumbnail(values["id"], values["path"])
         elif kind == "saved":
@@ -354,7 +358,7 @@ class TelegramPage(QWidget):
             if self.dead_since is None:
                 self.dead_since = now
             elif now - self.dead_since > 0.5:
-                self.finish("failed", error="Операция Telegram прервалась. Повторите попытку.")
+                self.finish("failed", error=tr('Операция Telegram прервалась. Повторите попытку.'))
 
     def finish(self, kind, **values):
         self.stop_process()
@@ -363,30 +367,31 @@ class TelegramPage(QWidget):
             self.token_input.clear()
             try:
                 save_connection(self.context.root, self.token, self.username)
-                self.status.setText(f"Подключён @{self.username}")
+                self.status.setText(tr('Подключён @{0}', self.username))
             except OSError:
-                self.status.setText("Бот подключён. Сохранить подключение не удалось, при следующем запуске введите токен.")
+                self.status.setText(tr('Бот подключён. Сохранить подключение не удалось, при следующем запуске введите токен.'))
         elif self.action == "download":
             for emoji in self.requested:
                 if emoji.id not in self.saved and emoji.id not in self.failed:
-                    self.failed[emoji.id] = "Загрузка прервана."
-            summary = f"Сохранено {len(self.saved)}"
+                    self.failed[emoji.id] = tr('Загрузка прервана.')
+            summary = tr('Сохранено {0}', len(self.saved))
             if self.failed:
-                summary += f" · Осталось {len(self.failed)}"
+                summary += tr(' · Осталось {0}', len(self.failed))
             if kind == "cancelled":
-                summary = "Отменено · " + summary
+                summary = tr('Отменено · ') + summary
             elif kind == "failed":
                 summary += " · " + values["error"]
             self.status.setText(summary)
             self.status.setToolTip("\n".join(dict.fromkeys(self.failed.values())))
             self.retry_button.setVisible(bool(self.failed))
             self.open_button.setVisible(bool(self.saved))
+            self.convert_button.setVisible(bool(self.saved))
         elif kind == "failed":
             self.status.setText(values["error"])
         elif kind == "cancelled":
-            self.status.setText("Отменено")
+            self.status.setText(tr('Отменено'))
         else:
-            self.status.setText("Выберите эмодзи для скачивания.")
+            self.status.setText(tr('Выберите эмодзи для скачивания.'))
         self.pending_token = ""
         self.cleanup()
         if values.get("auth"):
@@ -430,6 +435,10 @@ class TelegramPage(QWidget):
     def open_folder(self):
         if self.output_folder:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.output_folder)))
+
+    def convert_saved(self):
+        self.context.open_tool("files.convert")
+        self.context.tool_views["files.convert"].add_files([str(path) for path in self.saved.values()])
 
     def shutdown(self):
         self.pending_download = None

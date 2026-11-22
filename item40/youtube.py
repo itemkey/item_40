@@ -13,11 +13,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from .components import ensure_media
 from .downloads import Cancelled, check_cancel
-from .youtube_tools import ensure_tools, ffmpeg_formats
+from .i18n import tr
+from .youtube_tools import ffmpeg_formats
 
 TOOL_ID = "youtube.download"
-BAD_LINK = "Вставьте ссылку на отдельный ролик YouTube."
+BAD_LINK = tr('Вставьте ссылку на отдельный ролик YouTube.')
 
 
 @dataclass(frozen=True)
@@ -115,9 +117,9 @@ def video_url(value: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-def video_metadata(info: dict) -> Video:
+def video_metadata(info: dict, service="YouTube") -> Video:
     if info.get("live_status") in {"is_live", "is_upcoming"}:
-        raise ValueError("Скачивание будет доступно после завершения трансляции и публикации записи.")
+        raise ValueError(tr('Скачивание будет доступно после завершения трансляции и публикации записи.'))
     streams = []
     for item in reversed(info.get("formats", [])):
         stream_id, extension = item.get("format_id", ""), item.get("ext", "")
@@ -131,18 +133,18 @@ def video_metadata(info: dict) -> Video:
                               "" if audio == "none" else audio, item.get("width"), item.get("height"),
                               item.get("fps"), item.get("tbr") or item.get("abr"), item.get("language")))
     if not streams:
-        raise ValueError("YouTube не предоставил доступных потоков для этого ролика.")
+        raise ValueError(tr('{0}: доступные потоки отсутствуют.', service))
     return Video(info.get("title") or info.get("id") or "YouTube", info.get("duration"), streams)
 
 
-def save_download(source: Path, title: str) -> Path:
+def save_download(source: Path, title: str, extension=None, *, directory=None) -> Path:
     stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", title).strip(" .")[:120].rstrip(" .") or "YouTube"
     if re.fullmatch(r"CON|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³]", stem.split(".")[0], re.IGNORECASE):
         stem = "_" + stem
     index = 1
     while True:
         suffix = "" if index == 1 else f"_{index}"
-        target = source.parent.parent / f"{stem}{suffix}{source.suffix}"
+        target = Path(directory or source.parent.parent) / f"{stem}{suffix}{extension or source.suffix}"
         try:
             if os.name == "nt":
                 source.rename(target)
@@ -186,11 +188,13 @@ class ToolError(RuntimeError):
     pass
 
 
-def run_tool(args, cancel, on_line=None):
+def run_tool(args, cancel, on_line=None, *, cwd=None, extra_path=None):
     check_cancel(cancel)
     environment = os.environ.copy()
     environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     environment["PYTHONIOENCODING"] = "utf-8"
+    if extra_path is not None:
+        environment["PATH"] = str(extra_path) + os.pathsep + environment.get("PATH", "")
     bundle = getattr(sys, "_MEIPASS", None)
     if os.name == "nt" and bundle:
         kernel = ct.windll.kernel32
@@ -198,10 +202,13 @@ def run_tool(args, cancel, on_line=None):
         root = os.path.normcase(bundle)
         environment["PATH"] = os.pathsep.join(part for part in environment.get("PATH", "").split(os.pathsep)
                                               if not os.path.normcase(part).startswith(root))
+        for key in ("QT_PLUGIN_PATH", "QT_QPA_PLATFORM_PLUGIN_PATH"):
+            if os.path.normcase(environment.get(key, "")).startswith(root):
+                environment.pop(key, None)
     try:
         process = subprocess.Popen([str(arg) for arg in args], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), env=environment)
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), env=environment, cwd=cwd)
     finally:
         if os.name == "nt" and bundle:
             kernel.SetDllDirectoryW(bundle)
@@ -232,22 +239,22 @@ def run_tool(args, cancel, on_line=None):
     return "".join(result)
 
 
-def ytdlp_args(tools):
+def ytdlp_args(tools, *, playlist=False):
     ytdlp, deno, ffmpeg = tools
-    return [ytdlp / "yt-dlp.exe", "--ignore-config", "--no-plugin-dirs", "--no-playlist",
+    return [ytdlp / "yt-dlp.exe", "--ignore-config", "--no-plugin-dirs", *( [] if playlist else ["--no-playlist"]),
             "--encoding", "utf-8", "--socket-timeout", "20", "--abort-on-unavailable-fragments",
             "--no-js-runtimes", "--js-runtimes", f"deno:{deno / 'deno.exe'}",
             "--ffmpeg-location", ffmpeg]
 
 
 def inspect(url, tools, emit, cancel):
-    emit("progress", stage="Получение списка форматов YouTube", progress=None)
+    emit("progress", stage=tr('Получение списка форматов YouTube'), progress=None)
     result = run_tool([*ytdlp_args(tools), "--dump-single-json", "--skip-download", "--", url], cancel)
     return video_metadata(json.loads(result)), ffmpeg_formats(tools[2])
 
 
-def download(url, video, selection, folder, tools, emit, cancel):
-    emit("progress", stage="Скачивание с YouTube", progress=None)
+def download(url, video, selection, folder, tools, emit, cancel, *, service="YouTube", metadata=False):
+    emit("progress", stage=tr('Скачивание · {0}', service), progress=None)
     files = []
 
     def progress(line):
@@ -258,16 +265,17 @@ def download(url, video, selection, folder, tools, emit, cancel):
             size = info.get("total_bytes") or info.get("total_bytes_estimate")
             done = info.get("downloaded_bytes") or 0
             fraction = min(done / size, 1) if isinstance(size, (float, int)) and size > 0 else None
-            emit("progress", stage=f"Скачивание с YouTube · {done / 1e6:.1f} МБ", progress=fraction)
+            emit("progress", stage=tr('{0} · {1:.1f} МБ', service, done / 1e6), progress=fraction)
 
     options = ["--fixup", "never"] if selection.stream else ["--merge-output-format", "mkv"]
     run_tool([*ytdlp_args(tools), "-f", selection.selector(video.has_audio), *options,
               "--no-simulate", "--progress", "--newline", "--progress-delta", "0.2",
               "--progress-template", "download:progress:%(progress)j", "--print", "after_move:file:%(filepath)j",
+              *(["--embed-metadata"] if metadata else []),
               "-o", folder / "source.%(ext)s", "--", url], cancel, progress)
     if (len(files) != 1 or files[0].parent.resolve() != folder.resolve()
             or not files[0].is_file() or not files[0].stat().st_size):
-        raise RuntimeError("Не удалось найти скачанный файл.")
+        raise RuntimeError(tr('Не удалось найти скачанный файл.'))
     source = files[0]
     if selection.format:
         source = convert(source, selection.format, video.duration, tools[2], emit, cancel)
@@ -282,8 +290,9 @@ def download(url, video, selection, folder, tools, emit, cancel):
     return source, readable_audio
 
 
-def convert(source, output, duration, ffmpeg, emit, cancel):
-    emit("progress", stage="Конвертация файла", progress=None)
+def convert(source, output, duration, ffmpeg, emit, cancel, *, options=None):
+    options = options or {}
+    emit("progress", stage=tr('Конвертация файла'), progress=None)
     info = run_tool([ffmpeg / "ffprobe.exe", "-v", "error", "-show_entries",
                      "stream=codec_type,codec_name,channels", "-of", "json", source], cancel)
     codecs = {}
@@ -296,10 +305,11 @@ def convert(source, output, duration, ffmpeg, emit, cancel):
         if not encoder:
             continue
         if media_type not in codecs:
-            raise ValueError("В ролике отсутствует дорожка, необходимая для выбранного формата.")
+            raise ValueError(tr('В ролике отсутствует дорожка, необходимая для выбранного формата.'))
         kind = media_type[0]
         codec = codecs[media_type]
-        chosen = "copy" if CODEC_NAMES.get(encoder, encoder) == codec.get("codec_name") else encoder
+        force = options.get("width") or options.get("fps") if media_type == "video" else options.get("bitrate")
+        chosen = "copy" if not force and CODEC_NAMES.get(encoder, encoder) == codec.get("codec_name") else encoder
         args.extend(("-map", f"0:{kind}:0", f"-c:{kind}", chosen))
         if chosen in STEREO_ENCODERS and codec.get("channels", 0) > 2:
             args.extend(("-ac", "2"))
@@ -310,16 +320,22 @@ def convert(source, output, duration, ffmpeg, emit, cancel):
             args.extend(("-deadline", "good", "-cpu-used", "4", "-crf", "31", "-b:v", "0"))
         elif chosen == "libmp3lame":
             args.extend(("-q:a", "2"))
+        if kind == "a" and options.get("bitrate") and chosen != "copy":
+            args.extend(("-b:a", f"{options['bitrate']}k"))
+        if kind == "v" and options.get("width"):
+            args.extend(("-vf", f"scale={options['width']}:-2"))
+        if kind == "v" and options.get("fps"):
+            args.extend(("-r", str(options["fps"])))
 
     def progress(line):
         if duration and line.startswith("out_time_us="):
             value = line.partition("=")[2]
             if value.isdigit():
-                emit("progress", stage="Конвертация файла", progress=min(int(value) / 1e6 / duration, 1))
+                emit("progress", stage=tr('Конвертация файла'), progress=min(int(value) / 1e6 / duration, 1))
 
     run_tool([*args, "-f", output.muxer, target], cancel, progress)
     if not target.is_file() or not target.stat().st_size:
-        raise RuntimeError("FFmpeg не создал итоговый файл.")
+        raise RuntimeError(tr('FFmpeg не создал итоговый файл.'))
     return target
 
 
@@ -329,7 +345,7 @@ def worker(root, url, events, cancel, request=None):
 
     try:
         contain_processes()
-        tools = ensure_tools(Path(root), emit, cancel)
+        tools = ensure_media(Path(root), emit, cancel, ("yt-dlp", "deno", "ffmpeg"))
         if request is None:
             video, muxers = inspect(url, tools, emit, cancel)
             emit("inspected", video=video, muxers=muxers)
@@ -343,24 +359,24 @@ def worker(root, url, events, cancel, request=None):
         detail = str(error)
         lowered = detail.lower()
         if "no space left on device" in lowered or "not enough space" in lowered:
-            message = "На диске не хватает места для скачивания или конвертации."
+            message = tr('На диске не хватает места для скачивания или конвертации.')
         elif request is not None and ("invalid argument" in lowered or "encoder" in lowered or
                                     "could not write header" in lowered):
-            message = "FFmpeg не смог записать этот формат с выбранными кодеками. Попробуйте другой вариант."
+            message = tr('FFmpeg не смог записать этот формат с выбранными кодеками. Попробуйте другой вариант.')
         elif "private video" in lowered or "video unavailable" in lowered or "not available in your country" in lowered:
-            message = "Ролик недоступен или закрыт для просмотра."
+            message = tr('Ролик недоступен или закрыт для просмотра.')
         elif "requested format is not available" in lowered:
-            message = "Выбранный поток недоступен. Обновите список форматов."
+            message = tr('Выбранный поток недоступен. Обновите список форматов.')
         elif "sign in" in lowered or "http error 403" in lowered or "http error 429" in lowered:
-            message = "YouTube отклонил запрос. Попробуйте другой доступный ролик или повторите загрузку позже."
+            message = tr('YouTube отклонил запрос. Попробуйте другой доступный ролик или повторите загрузку позже.')
         else:
-            message = "Не удалось обработать ссылку. Проверьте подключение и повторите попытку."
+            message = tr('Не удалось обработать ссылку. Проверьте подключение и повторите попытку.')
         logging.warning("YouTube: %s", detail)
         emit("failed", error=message, detail=detail)
     except (ValueError, RuntimeError) as error:
         emit("failed", error=str(error))
     except OSError as error:
-        emit("failed", error=f"Не удалось запустить загрузку или записать файл. {error}")
+        emit("failed", error=tr('Не удалось запустить загрузку или записать файл. {0}', error))
     except Exception:
         logging.exception("YouTube worker failed")
-        emit("failed", error="Не удалось завершить загрузку. Повторите попытку.")
+        emit("failed", error=tr('Не удалось завершить загрузку. Повторите попытку.'))

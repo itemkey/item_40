@@ -22,6 +22,13 @@ for package in ('faster_whisper', 'ctranslate2', 'av', 'tokenizers', 'onnxruntim
     binaries += package_binaries
     hiddenimports += package_imports
 datas += collect_data_files('certifi')
+for package in ('pypdfium2', 'pypdfium2_raw', 'rlottie_python'):
+    package_datas, package_binaries, package_imports = collect_all(package)
+    datas += package_datas
+    binaries += package_binaries
+    hiddenimports += package_imports
+datas += [(str(ROOT / 'item40/translations'), 'item40/translations'),
+          (str(ROOT / 'item40/component_manifest.json'), 'item40')]
 datas += [(str(ROOT / 'README.md'), '.'), (str(ROOT / 'THIRD_PARTY_NOTICES.md'), '.')]
 datas.append((str(ROOT / 'docs'), 'docs'))
 for distribution in metadata.distributions():

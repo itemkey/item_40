@@ -11,17 +11,18 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..i18n import tr
 from .widgets import button, label
 
 
 class FileOrderDialog(QDialog):
-    def __init__(self, paths, parent=None, *, editable=True, accept_text="Объединить"):
+    def __init__(self, paths, parent=None, *, editable=True, accept_text=tr('Объединить')):
         super().__init__(parent)
-        self.setWindowTitle("Порядок файлов")
+        self.setWindowTitle(tr('Порядок файлов'))
         self.resize(580, 420)
         layout = QVBoxLayout(self)
         if editable:
-            layout.addWidget(label("Порядок: сверху вниз. Строки можно перетаскивать.", "muted"))
+            layout.addWidget(label(tr('Порядок: сверху вниз. Строки можно перетаскивать.'), "muted"))
         self.list = QListWidget()
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         if editable:
@@ -35,8 +36,8 @@ class FileOrderDialog(QDialog):
         layout.addWidget(self.list, 1)
         if editable:
             controls = QHBoxLayout()
-            self.up = button("Вверх", callback=lambda: self.move(-1))
-            self.down = button("Вниз", callback=lambda: self.move(1))
+            self.up = button(tr('Вверх'), callback=lambda: self.move(-1))
+            self.down = button(tr('Вниз'), callback=lambda: self.move(1))
             controls.addWidget(self.up)
             controls.addWidget(self.down)
             controls.addStretch()
@@ -46,9 +47,9 @@ class FileOrderDialog(QDialog):
         if editable:
             confirm = buttons.addButton(accept_text, QDialogButtonBox.ButtonRole.AcceptRole)
             confirm.clicked.connect(self.accept)
-            buttons.addButton("Отмена", QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
+            buttons.addButton(tr('Отмена'), QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
         else:
-            buttons.addButton("Закрыть", QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
+            buttons.addButton(tr('Закрыть'), QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
         layout.addWidget(buttons)
         self.list.setCurrentRow(0)
         if editable:

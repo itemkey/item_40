@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.5.0"
+  #define AppVersion "0.6.0"
 #endif
 [Setup]
 #ifdef TestAppId
@@ -53,7 +53,26 @@ Name: "{group}\item-40"; Filename: "{app}\item-40.exe"
 Name: "{autodesktop}\item-40"; Filename: "{app}\item-40.exe"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; Flags: unchecked
+
+[CustomMessages]
+russian.DesktopShortcut=Создать ярлык на рабочем столе
+english.DesktopShortcut=Create a desktop shortcut
+russian.LaunchApp=Запустить item-40
+english.LaunchApp=Launch item-40
+
+[Registry]
+#ifdef TestAppId
+Root: HKCU; Subkey: "Software\{#TestAppId}"; ValueType: string; ValueName: "UILanguage"; ValueData: "{code:InterfaceLanguage}"
+#else
+Root: HKCU; Subkey: "Software\item-40"; ValueType: string; ValueName: "UILanguage"; ValueData: "{code:InterfaceLanguage}"
+#endif
+
+[Code]
+function InterfaceLanguage(Param: String): String;
+begin
+  if ActiveLanguage = 'russian' then Result := 'ru' else Result := 'en';
+end;
 
 [Run]
-Filename: "{app}\item-40.exe"; Description: "Запустить item-40"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\item-40.exe"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent

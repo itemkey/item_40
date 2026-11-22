@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from .domain import result_stem
+from .i18n import tr
 from .paths import default_output_dir
 
 
@@ -62,5 +63,5 @@ def save_result(store, job_id: str) -> Path | None:
                 destination.unlink(missing_ok=True)
             except OSError:
                 pass
-        store.update(job_id, output_error=f"Не удалось сохранить TXT: {error}")
+        store.update(job_id, output_error=tr('Не удалось сохранить TXT: {0}', error))
         return None

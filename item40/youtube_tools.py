@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from .downloads import check_cancel, download_file
+from .i18n import tr
 
 
 @dataclass(frozen=True)
@@ -22,9 +23,9 @@ class Package:
 
 
 PACKAGES = (
-    Package("yt-dlp", "2026.11.17.232707", "yt-dlp.exe",
-            "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.11.17.232707/yt-dlp.exe",
-            "75159ec1013cffc33a5e18fb7d78ae0d008eff51b4a95db57f963859e4d7ffda", ("yt-dlp.exe",)),
+    Package("yt-dlp", "2026.11.21.232659", "yt-dlp.exe",
+            "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.11.21.232659/yt-dlp.exe",
+            "937b1024a937f0f2b50f6ef85f700383ecc0c96675aba3095801c5a1384cacd1", ("yt-dlp.exe",)),
     Package("deno", "2.9.8", "deno.zip",
             "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
             "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf", ("deno.exe",)),
@@ -36,11 +37,13 @@ PACKAGES = (
 )
 
 
-def ensure_tools(root: Path, emit, cancel) -> list[Path]:
+def ensure_tools(root: Path, emit, cancel, names=None) -> list[Path]:
     import requests
 
     folders = []
     for package in PACKAGES:
+        if names is not None and package.name not in names:
+            continue
         check_cancel(cancel)
         folder = root / "tools" / "youtube" / package.name / package.version
         ready = folder / ".ready"
@@ -49,12 +52,12 @@ def ensure_tools(root: Path, emit, cancel) -> list[Path]:
             continue
         ready.unlink(missing_ok=True)
         archive = folder / package.file
-        stage = f"Подготовка YouTube · {package.name}"
+        stage = tr('Подготовка YouTube · {0}', package.name)
         emit("progress", stage=stage, progress=None)
         try:
             download_file(package.url, archive, package.sha256, emit, cancel, label=stage)
         except requests.RequestException as error:
-            raise RuntimeError(f"Не удалось скачать {package.name}. Проверьте доступ к GitHub и повторите попытку.") from error
+            raise RuntimeError(tr('Не удалось скачать {0}. Проверьте доступ к GitHub и повторите попытку.', package.name)) from error
         if archive.suffix == ".zip":
             with zipfile.ZipFile(archive) as zipped:
                 for member in zipped.infolist():
@@ -68,7 +71,7 @@ def ensure_tools(root: Path, emit, cancel) -> list[Path]:
                             check_cancel(cancel)
                             output.write(block)
         if not all((folder / name).is_file() for name in package.files):
-            raise RuntimeError(f"Не удалось подготовить {package.name}: в архиве отсутствуют необходимые файлы.")
+            raise RuntimeError(tr('Не удалось подготовить {0}: в архиве отсутствуют необходимые файлы.', package.name))
         ready.touch()
         if archive.suffix == ".zip":
             archive.unlink()

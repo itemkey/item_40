@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from ..domain import AUDIO_FILTER, MODEL_LABELS, STATUS_LABELS, job_files, result_stem, source_label
 from ..exports import output_directory, save_result, write_text_atomic
+from ..i18n import tr
 from .file_order import FileOrderDialog
 from .theme import icon
 from .transcript_editor import TranscriptEditor
@@ -48,7 +49,7 @@ class AudioPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(20)
-        layout.addWidget(heading("Аудио → текст"))
+        layout.addWidget(heading(tr('Аудио → текст')))
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(18)
         layout.addWidget(splitter, 1)
@@ -69,14 +70,14 @@ class AudioPage(QWidget):
         left_scroll.setWidget(input_body)
         left_layout.addWidget(left_scroll, 1)
         title_row = QHBoxLayout()
-        title_row.addWidget(label("Файлы", "sectionTitle"))
+        title_row.addWidget(label(tr('Файлы'), "sectionTitle"))
         title_row.addStretch()
-        title_row.addWidget(button("Добавить", callback=self.browse))
-        self.remove_button = button("Убрать", callback=self.remove_selected)
-        self.remove_button.setToolTip("Убрать выбранные записи из списка. Файлы на диске не удаляются.")
+        title_row.addWidget(button(tr('Добавить'), callback=self.browse))
+        self.remove_button = button(tr('Убрать'), callback=self.remove_selected)
+        self.remove_button.setToolTip(tr('Убрать выбранные записи из списка. Файлы на диске не удаляются.'))
         title_row.addWidget(self.remove_button)
         input_layout.addLayout(title_row)
-        self.queue_count = label("0 файлов", "muted")
+        self.queue_count = label(tr('0 файлов'), "muted")
         self.drop = DropZone()
         self.drop.browse_requested.connect(self.browse)
         self.drop.files_dropped.connect(self.add_files)
@@ -84,20 +85,20 @@ class AudioPage(QWidget):
 
         options = QHBoxLayout()
         quality_column = QVBoxLayout()
-        quality_column.addWidget(label("Качество", "muted"))
+        quality_column.addWidget(label(tr('Качество'), "muted"))
         self.quality = QComboBox()
         for key, text in MODEL_LABELS.items():
             self.quality.addItem(text, key)
         self.quality.setCurrentIndex(max(0, self.quality.findData(self.store.setting("model", "small"))))
-        self.quality.setToolTip("small: загрузка около 0,5 ГБ. large-v3: около 3,1 ГБ. Модель скачивается один раз.")
+        self.quality.setToolTip(tr('small: загрузка около 0,5 ГБ. large-v3: около 3,1 ГБ. Модель скачивается один раз.'))
         self.quality.currentIndexChanged.connect(lambda: self.store.set_setting("model", self.quality.currentData()))
         quality_column.addWidget(self.quality)
         options.addLayout(quality_column, 1)
         language_column = QVBoxLayout()
-        language_column.addWidget(label("Язык записи", "muted"))
+        language_column.addWidget(label(tr('Язык записи'), "muted"))
         self.language = QComboBox()
-        self.language.addItem("Определить", None)
-        self.language.addItem("Русский", "ru")
+        self.language.addItem(tr('Определить'), None)
+        self.language.addItem(tr('Русский'), "ru")
         self.language.addItem("English", "en")
         # All multilingual Whisper languages are available without a separate service.
         from faster_whisper.tokenizer import _LANGUAGE_CODES
@@ -112,8 +113,8 @@ class AudioPage(QWidget):
         options.addLayout(language_column, 1)
         input_layout.addLayout(options)
         group_controls = QHBoxLayout()
-        self.combine_button = button("Объединить…", callback=self.combine_selected)
-        self.combine_button.setToolTip("Одна расшифровка для выбранных файлов. Ctrl+A — выбрать все.")
+        self.combine_button = button(tr('Объединить…'), callback=self.combine_selected)
+        self.combine_button.setToolTip(tr('Одна расшифровка для выбранных файлов. Ctrl+A — выбрать все.'))
         group_controls.addWidget(self.combine_button)
         group_controls.addStretch()
         input_layout.addLayout(group_controls)
@@ -132,26 +133,26 @@ class AudioPage(QWidget):
         remove_action.triggered.connect(self.remove_selected)
         self.list.addAction(remove_action)
         input_layout.addWidget(self.list, 1)
-        self.empty_queue = label("Список пуст", "muted")
+        self.empty_queue = label(tr('Список пуст'), "muted")
         input_layout.addWidget(self.empty_queue, 1)
         input_layout.addWidget(self.queue_count)
         self.queue_progress = QProgressBar()
         self.queue_progress.setRange(0, 1000)
         self.queue_progress.setTextVisible(False)
         left_layout.addWidget(self.queue_progress)
-        self.stage = label("Готово к работе", "muted", True)
+        self.stage = label(tr('Готово к работе'), "muted", True)
         self.stage.setMinimumHeight(24)
         left_layout.addWidget(self.stage)
         actions = QHBoxLayout()
-        self.run_button = button("Расшифровать", "play", True, self.start)
+        self.run_button = button(tr('Расшифровать'), "play", True, self.start)
         self.run_button.setMinimumHeight(42)
         actions.addWidget(self.run_button, 1)
         self.cancel_button = button("", "stop", callback=self.cancel_selected)
-        self.cancel_button.setToolTip("Отменить выбранную задачу")
+        self.cancel_button.setToolTip(tr('Отменить выбранную задачу'))
         self.cancel_button.setMinimumHeight(42)
         actions.addWidget(self.cancel_button)
         self.retry_button = button("", "refresh", callback=self.retry_selected)
-        self.retry_button.setToolTip("Повторить выбранную задачу")
+        self.retry_button.setToolTip(tr('Повторить выбранную задачу'))
         self.retry_button.setMinimumHeight(42)
         actions.addWidget(self.retry_button)
         left_layout.addLayout(actions)
@@ -161,14 +162,14 @@ class AudioPage(QWidget):
         right.setMinimumWidth(390)
         editor_header = QHBoxLayout()
         editor_title = QVBoxLayout()
-        editor_title.addWidget(label("Текст расшифровки", "sectionTitle"))
+        editor_title.addWidget(label(tr('Текст расшифровки'), "sectionTitle"))
         self.filename = label("", "muted")
         self.filename.setMaximumWidth(440)
         editor_title.addWidget(self.filename)
         editor_header.addLayout(editor_title, 1)
         self.copy_button = button("", "copy", callback=self.copy)
-        self.copy_button.setToolTip("Копировать текст")
-        self.export_button = button("Сохранить как…", callback=self.export)
+        self.copy_button.setToolTip(tr('Копировать текст'))
+        self.export_button = button(tr('Сохранить как…'), callback=self.export)
         editor_header.addWidget(self.copy_button)
         editor_header.addWidget(self.export_button)
         right_layout.addLayout(editor_header)
@@ -176,7 +177,7 @@ class AudioPage(QWidget):
         placeholder = QWidget()
         placeholder_layout = QVBoxLayout(placeholder)
         placeholder_layout.addStretch()
-        self.empty_hint = label("Выберите файл", "muted")
+        self.empty_hint = label(tr('Выберите файл'), "muted")
         self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder_layout.addWidget(self.empty_hint)
         placeholder_layout.addStretch()
@@ -191,7 +192,7 @@ class AudioPage(QWidget):
         self.error.hide()
         right_layout.addWidget(self.error)
         footer = QHBoxLayout()
-        self.char_count = label("0 символов", "muted")
+        self.char_count = label(tr('0 символов'), "muted")
         self.saved_hint = label("", "muted")
         footer.addWidget(self.char_count)
         footer.addStretch()
@@ -205,7 +206,7 @@ class AudioPage(QWidget):
         self.refresh()
 
     def browse(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "Выберите записи", "", AUDIO_FILTER)
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('Выберите записи'), "", AUDIO_FILTER)
         self.add_files(paths)
 
     def add_files(self, paths):
@@ -258,7 +259,7 @@ class AudioPage(QWidget):
                 job_id = self.manager.combine_sources(ids, dialog.paths(), self.quality.currentData(),
                     self.language.currentData(), self.store.setting("device", "auto"))
             except ValueError as error:
-                self.context.show_error("Не удалось объединить", str(error))
+                self.context.show_error(tr('Не удалось объединить'), str(error))
                 return
             self.refresh()
             self.select(job_id)
@@ -268,12 +269,12 @@ class AudioPage(QWidget):
         if not job or len(job_files(job)) < 2:
             return
         editable = job["status"] == "queued"
-        dialog = FileOrderDialog(job_files(job), self, editable=editable, accept_text="Сохранить")
+        dialog = FileOrderDialog(job_files(job), self, editable=editable, accept_text=tr('Сохранить'))
         if dialog.exec() == QDialog.DialogCode.Accepted and editable:
             try:
                 self.store.reorder_sources(job_id, dialog.paths())
             except ValueError as error:
-                self.context.show_error("Порядок файлов", str(error))
+                self.context.show_error(tr('Порядок файлов'), str(error))
                 return
             self.refresh(job_id)
 
@@ -286,8 +287,8 @@ class AudioPage(QWidget):
             job_id = current.data(Qt.ItemDataRole.UserRole)
             job = self.store.get(job_id)
             if job and len(job_files(job)) > 1:
-                menu.addAction("Порядок файлов…", lambda: self.edit_order(job_id))
-        menu.addAction("Убрать из списка", self.remove_selected)
+                menu.addAction(tr('Порядок файлов…'), lambda: self.edit_order(job_id))
+        menu.addAction(tr('Убрать из списка'), self.remove_selected)
         menu.exec(self.list.viewport().mapToGlobal(position))
 
     def remove_selected(self):
@@ -344,22 +345,22 @@ class AudioPage(QWidget):
             item.setText(f"{source_label(job)}\n{STATUS_LABELS[job['status']]}{percent}")
             item.setIcon(icon("check" if job["status"] == "completed" else "audio",
                               "#aaaaaa"))
-            item.setToolTip("\n".join(job_files(job)) + "\n" + job["stage"])
+            item.setToolTip("\n".join(job_files(job)) + "\n" + tr(job["stage"]))
         self.list.blockSignals(False)
         pending = len(self.store.pending())
         active = self.store.get(self.manager.active) if self.manager.active and not self.manager.download_only else None
-        self.queue_count.setText(f"Файлов: {sum(len(job_files(job)) for job in jobs)}")
+        self.queue_count.setText(tr('Файлов: {0}', sum(len(job_files(job)) for job in jobs)))
         self.empty_queue.setVisible(not jobs)
         self.list.setVisible(bool(jobs))
         self.update_remove_button()
         self.run_button.setEnabled(not self.manager.download_only)
-        self.run_button.setText("Очередь запущена" if self.manager.enabled and active else "Расшифровать")
+        self.run_button.setText(tr('Очередь запущена') if self.manager.enabled and active else tr('Расшифровать'))
         if active:
             self.queue_progress.setValue(int(active["progress"] * 1000))
-            self.stage.setText(active["stage"])
+            self.stage.setText(tr(active["stage"]))
         else:
             self.queue_progress.setValue(0)
-            self.stage.setText(f"Ожидают запуска: {pending}" if pending else "Готово к работе")
+            self.stage.setText(tr('Ожидают запуска: {0}', pending) if pending else tr('Готово к работе'))
         if not self.selected_id and self.list.count():
             self.list.setCurrentRow(0)
             if not self.selected_id:
@@ -377,30 +378,30 @@ class AudioPage(QWidget):
         running = bool(job and job["status"] in {"queued", "running"})
         self.editor.setReadOnly(not job or running)
         self.result_stack.setCurrentIndex(1 if text or (job and not running) else 0)
-        self.empty_hint.setText("Распознавание…"
+        self.empty_hint.setText(tr('Распознавание…')
                                if job and job["status"] == "running" else
-                               "Ожидает запуска" if job else "Выберите файл")
-        self.char_count.setText(f"{len(self.editor.toPlainText()):,} символов".replace(",", " "))
-        self.saved_hint.setText("TXT сохранён" if job and job["output_path"] and not job["output_error"] else "")
+                               tr('Ожидает запуска') if job else tr('Выберите файл'))
+        self.char_count.setText(tr('{0:,} символов', len(self.editor.toPlainText())).replace(",", " "))
+        self.saved_hint.setText(tr('TXT сохранён') if job and job["output_path"] and not job["output_error"] else "")
         self.saved_hint.setToolTip(job["output_path"] if job else "")
         self.copy_button.setEnabled(bool(text))
         self.export_button.setEnabled(bool(text))
         self.cancel_button.setEnabled(bool(job and job["status"] in {"queued", "running"}))
         self.retry_button.setEnabled(bool(job and job["status"] in {"failed", "cancelled", "interrupted"}))
-        errors = "\n".join(filter(None, (job["error"], job["output_error"]))) if job else ""
+        errors = "\n".join(tr(message) for message in (job["error"], job["output_error"]) if message) if job else ""
         self.error.setText(errors)
         self.error.setVisible(bool(errors))
         if job and job["status"] == "completed" and not text:
-            self.editor.setPlaceholderText("В этой записи речь не обнаружена.")
+            self.editor.setPlaceholderText(tr('В этой записи речь не обнаружена.'))
         else:
-            self.editor.setPlaceholderText("Введите или исправьте текст…")
+            self.editor.setPlaceholderText(tr('Введите или исправьте текст…'))
 
     def on_edit(self):
         if self.selected_id and not self.editor.isReadOnly():
             self.dirty = True
             self.save_timer.start()
             text = self.editor.toPlainText()
-            self.char_count.setText(f"{len(text)} символов")
+            self.char_count.setText(tr('{0} символов', len(text)))
             self.copy_button.setEnabled(bool(text))
             self.export_button.setEnabled(bool(text))
 
@@ -415,18 +416,18 @@ class AudioPage(QWidget):
 
     def copy(self):
         QApplication.clipboard().setText(self.editor.toPlainText())
-        self.context.show_notice("Текст скопирован")
+        self.context.show_notice(tr('Текст скопирован'))
 
     def export(self):
         if not self.selected_id:
             return
         job = self.store.get(self.selected_id)
-        path, _ = QFileDialog.getSaveFileName(self, "Сохранить текст",
+        path, _ = QFileDialog.getSaveFileName(self, tr('Сохранить текст'),
                                              str(output_directory(self.store) / (result_stem(job) + ".txt")),
-                                             "Текст UTF-8 (*.txt)")
+                                             tr('Текст UTF-8 (*.txt)'))
         if path:
             try:
                 write_text_atomic(Path(path), self.editor.toPlainText())
-                self.context.show_notice("Текст сохранён: " + path)
+                self.context.show_notice(tr('Текст сохранён: ') + path)
             except OSError as error:
-                self.context.show_error("Не удалось сохранить текст", str(error))
+                self.context.show_error(tr('Не удалось сохранить текст'), str(error))

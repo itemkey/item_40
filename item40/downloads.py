@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from .domain import MODEL_REPOS
+from .i18n import tr
 
 
 class Cancelled(Exception):
@@ -21,7 +22,7 @@ def check_cancel(cancel):
 
 def ensure_model(model: str, root: Path, emit: Callable, cancel) -> Path:
     if model not in MODEL_REPOS:
-        raise ValueError("Неизвестная модель")
+        raise ValueError(tr('Неизвестная модель'))
     folder = root / "models" / model
     required = ("config.json", "model.bin", "tokenizer.json")
     def complete():
@@ -32,7 +33,7 @@ def ensure_model(model: str, root: Path, emit: Callable, cancel) -> Path:
         return folder
     from huggingface_hub import HfApi, hf_hub_url
     check_cancel(cancel)
-    emit("progress", stage="Скачивание модели · потребуется интернет", progress=0)
+    emit("progress", stage=tr('Скачивание модели · потребуется интернет'), progress=0)
     info = HfApi().model_info(MODEL_REPOS[model], files_metadata=True)
     files = [file for file in info.siblings if file.rfilename in (*required, "preprocessor_config.json")
              or file.rfilename.startswith("vocabulary.")]
@@ -42,18 +43,18 @@ def ensure_model(model: str, root: Path, emit: Callable, cancel) -> Path:
         check_cancel(cancel)
         digest = file.lfs.sha256 if file.lfs else file.blob_id
         if not digest:
-            raise RuntimeError("Сервер не предоставил контрольную сумму модели.")
+            raise RuntimeError(tr('Сервер не предоставил контрольную сумму модели.'))
 
         def progress(kind, **values):
             values["progress"] = (completed + values.get("progress", 0) * (file.size or 0)) / max(total, 1)
             emit(kind, **values)
 
         download_file(hf_hub_url(MODEL_REPOS[model], file.rfilename, revision=info.sha),
-                      folder / file.rfilename, digest, progress, cancel, label=f"Модель {model}")
+                      folder / file.rfilename, digest, progress, cancel, label=tr('Модель {0}', model))
         completed += file.size or 0
     check_cancel(cancel)
     if not complete():
-        raise RuntimeError("Модель скачана не полностью. Повторите загрузку.")
+        raise RuntimeError(tr('Модель скачана не полностью. Повторите загрузку.'))
     (folder / ".ready").write_text(json.dumps({"revision": info.sha}), encoding="utf-8")
     return folder
 
@@ -69,7 +70,7 @@ GPU_PACKAGES = (
 )
 
 
-def download_file(url: str, destination: Path, expected_hash: str, emit: Callable, cancel, label="GPU-компоненты"):
+def download_file(url: str, destination: Path, expected_hash: str, emit: Callable, cancel, label=tr('GPU-компоненты')):
     import requests
 
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -107,13 +108,13 @@ def download_file(url: str, destination: Path, expected_hash: str, emit: Callabl
                     done += len(block)
                     if time.monotonic() - last > 0.15:
                         last = time.monotonic()
-                        stage = (f"{label}: {done / 1e6:.0f} / {total / 1e6:.0f} МБ" if total > 1_000_000
-                                 else f"{label}: служебные файлы")
+                        stage = (tr('{0}: {1:.0f} / {2:.0f} МБ', label, done / 1e6, total / 1e6) if total > 1_000_000
+                                 else tr('{0}: служебные файлы', label))
                         emit("progress", stage=stage,
                              progress=min(0.99, done / total) if total else 0)
     if hash_file(partial) != expected_hash:
         partial.unlink(missing_ok=True)
-        raise RuntimeError("Контрольная сумма загрузки не совпала. Повторите попытку.")
+        raise RuntimeError(tr('Контрольная сумма загрузки не совпала. Повторите попытку.'))
     partial.replace(destination)
 
 
@@ -128,7 +129,7 @@ def ensure_gpu(root: Path, emit: Callable, cancel) -> Path:
         if done_marker.exists():
             continue
         archive = target / f"{name}.whl"
-        emit("progress", stage=f"Загрузка GPU-компонентов · {name}", progress=0)
+        emit("progress", stage=tr('Загрузка GPU-компонентов · {0}', name), progress=0)
         download_file(url, archive, digest, emit, cancel)
         with zipfile.ZipFile(archive) as wheel:
             for member in wheel.infolist():

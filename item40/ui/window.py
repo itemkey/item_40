@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..registry import builtin_tools
 from ..telegram import TOOL_ID as TELEGRAM_TOOL_ID
 from ..youtube import TOOL_ID
@@ -52,11 +53,15 @@ class MainWindow(QMainWindow):
         side.addSpacing(24)
         self.stack = QStackedWidget()
         self.catalog = CatalogPage(self, self.tool_definitions)
-        self.add_page("catalog", "Инструменты", "grid", self.catalog, side)
-        self.add_page("jobs", "Задачи", "tasks", JobsPage(self), side)
-        self.add_page("history", "История", "history", JobsPage(self, history=True), side)
+        catalog_scroll = QScrollArea()
+        catalog_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        catalog_scroll.setWidgetResizable(True)
+        catalog_scroll.setWidget(self.catalog)
+        self.add_page("catalog", tr('Инструменты'), "grid", catalog_scroll, side)
+        self.add_page("jobs", tr('Задачи'), "tasks", JobsPage(self), side)
+        self.add_page("history", tr('История'), "history", JobsPage(self, history=True), side)
         side.addSpacing(28)
-        side.addWidget(label("   КАТЕГОРИИ", "eyebrow"))
+        side.addWidget(label(tr('   КАТЕГОРИИ'), "eyebrow"))
         side.addSpacing(6)
         for category in sorted({tool.category for tool in self.tool_definitions}):
             glyph = next(tool.icon for tool in self.tool_definitions if tool.category == category)
@@ -76,7 +81,7 @@ class MainWindow(QMainWindow):
         settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
         settings_scroll.setWidgetResizable(True)
         settings_scroll.setWidget(self.settings)
-        self.add_page("settings", "Настройки", "settings", settings_scroll, side)
+        self.add_page("settings", tr('Настройки'), "settings", settings_scroll, side)
         side.addSpacing(18)
         layout.addWidget(sidebar)
         main = QWidget()
@@ -158,6 +163,9 @@ class MainWindow(QMainWindow):
             self.tool_views[TOOL_ID].shutdown()
         if TELEGRAM_TOOL_ID in self.tool_views:
             self.tool_views[TELEGRAM_TOOL_ID].shutdown()
+        for key in ("files.convert", "soundcloud.download"):
+            if key in self.tool_views:
+                self.tool_views[key].shutdown()
         self.manager.shutdown()
         self.store.close()
         event.accept()

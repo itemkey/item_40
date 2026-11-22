@@ -4,6 +4,8 @@ import logging
 import multiprocessing
 import sys
 
+from .i18n import tr
+
 
 def main():
     # This must run before Qt is imported in frozen multiprocessing children.
@@ -11,6 +13,9 @@ def main():
     if len(sys.argv) == 4 and sys.argv[1] == "--smoke-test":
         from .diagnostics import smoke_test
         return smoke_test(sys.argv[2], sys.argv[3])
+    from .i18n import install_qt_translation, selected_language, set_language
+
+    set_language(selected_language())
     from PySide6.QtCore import QLockFile
     from PySide6.QtGui import QColor, QFont, QPalette
     from PySide6.QtWidgets import QApplication, QMessageBox
@@ -26,6 +31,7 @@ def main():
     logging.basicConfig(filename=root / "app.log", encoding="utf-8", level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
     app = QApplication(sys.argv)
+    app.ui_translator = install_qt_translation(app)
     app.setApplicationName("item-40")
     app.setOrganizationName("item-40")
     app.setStyle("Fusion")
@@ -43,7 +49,7 @@ def main():
     lock = QLockFile(str(root / "app.lock"))
     lock.setStaleLockTime(0)
     if not lock.tryLock(100):
-        QMessageBox.information(None, "item-40", "Приложение уже запущено.")
+        QMessageBox.information(None, "item-40", tr('Приложение уже запущено.'))
         return 0
     store = Store(database_path(root))
     gpu = nvidia_gpu()

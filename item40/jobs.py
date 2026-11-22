@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from .domain import JobRequest, format_transcript
 from .exports import save_result
+from .i18n import tr
 from .storage import Store
 from .worker import run_job
 
@@ -51,7 +52,7 @@ class JobManager(QObject):
 
     def combine_sources(self, job_ids, paths, model, language, device):
         if len(paths) < 2:
-            raise ValueError("Выберите хотя бы два файла.")
+            raise ValueError(tr('Выберите хотя бы два файла.'))
         request = JobRequest(source=paths[0], source_files=list(paths), model=model,
                              language=language, device=device)
         self.store.combine_sources(request, job_ids)
@@ -79,7 +80,7 @@ class JobManager(QObject):
         self.events = self.context.Queue()
         self.cancel_event = self.context.Event()
         if not download_only:
-            self.store.update(request.id, status="running", progress=0, stage="Подготовка", error="",
+            self.store.update(request.id, status="running", progress=0, stage=tr('Подготовка'), error="",
                               transcript="", segments=[], edited=0)
         self.process = self.context.Process(target=run_job,
             args=(request, self.root, self.events, self.cancel_event), daemon=True)
@@ -92,7 +93,7 @@ class JobManager(QObject):
 
     def download_model(self, model):
         if self.active:
-            self.notice.emit("Дождитесь завершения текущей задачи или отмените её.")
+            self.notice.emit(tr('Дождитесь завершения текущей задачи или отмените её.'))
             return
         self._launch(JobRequest(source="", model=model, tool_id="models.download"), download_only=True)
 
@@ -100,7 +101,7 @@ class JobManager(QObject):
         job = self.store.get(job_id)
         if job and job["status"] in {"failed", "cancelled", "interrupted"}:
             self.store.restore_source(job_id)
-            self.store.update(job_id, status="queued", progress=0, error="", stage="Повторная попытка")
+            self.store.update(job_id, status="queued", progress=0, error="", stage=tr('Повторная попытка'))
             self.changed.emit(job_id)
 
     def cancel(self, job_id):
@@ -108,7 +109,7 @@ class JobManager(QObject):
             self.cancel_event.set()
             self.cancel_time = time.monotonic()
         elif self.store.get(job_id):
-            self.store.update(job_id, status="cancelled", stage="Отменено")
+            self.store.update(job_id, status="cancelled", stage=tr('Отменено'))
             self.changed.emit(job_id)
 
     def remove_sources(self, job_ids):
@@ -159,7 +160,7 @@ class JobManager(QObject):
                 self.dead_since = time.monotonic()
             elif time.monotonic() - self.dead_since > 1:
                 self._finish("cancelled" if self.cancel_time else "failed",
-                             "Процесс обработки завершился неожиданно. Попробуйте режим процессора.")
+                             tr('Процесс обработки завершился неожиданно. Попробуйте режим процессора.'))
         else:
             self.dead_since = None
 
@@ -177,13 +178,13 @@ class JobManager(QObject):
             self.events.close()
             self.events.cancel_join_thread()
         if self.download_only:
-            message = {"completed": "Модель скачана", "cancelled": "Загрузка отменена"}.get(status, error)
+            message = {"completed": tr('Модель скачана'), "cancelled": tr('Загрузка отменена')}.get(status, error)
             self.download_changed.emit(message, 1 if status == "completed" else 0)
         elif job_id:
             job = self.store.get(job_id)
             values = {"status": status, "error": error,
-                      "stage": {"completed": "Готово" if job["transcript"] else "Речь не обнаружена",
-                                "cancelled": "Отменено · частичный текст сохранён", "failed": error}[status]}
+                      "stage": {"completed": tr('Готово') if job["transcript"] else tr('Речь не обнаружена'),
+                                "cancelled": tr('Отменено · частичный текст сохранён'), "failed": error}[status]}
             if status == "completed":
                 values["progress"] = 1
             self.store.update(job_id, **values)
@@ -206,7 +207,7 @@ class JobManager(QObject):
                 self.process.terminate()
                 self.process.join(timeout=2)
             if not self.download_only:
-                self.store.update(self.active, status="interrupted", stage="Прервано при закрытии программы")
+                self.store.update(self.active, status="interrupted", stage=tr('Прервано при закрытии программы'))
             self.process.close()
             self.events.close()
             self.events.cancel_join_thread()

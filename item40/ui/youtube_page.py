@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..youtube import AUDIO_FORMATS, VIDEO_FORMATS, Format, Selection, save_download, video_url, worker
 from .widgets import button, heading, label, panel
 
@@ -46,34 +47,34 @@ class YouTubePage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-        layout.addWidget(heading("Скачать с YouTube", "Видео или аудио по ссылке на ролик."))
+        layout.addWidget(heading(tr('Скачать с YouTube'), tr('Видео или аудио по ссылке на ролик.')))
 
         frame, link_panel = panel()
         self.link = QLineEdit(placeholderText="https://www.youtube.com/watch?v=…")
-        self.link.setAccessibleName("Ссылка на ролик YouTube")
+        self.link.setAccessibleName(tr('Ссылка на ролик YouTube'))
         self.link.returnPressed.connect(self.lookup)
         self.link.textChanged.connect(self.reset_link)
-        self.lookup_button = button("Загрузить форматы", "search", callback=self.lookup)
+        self.lookup_button = button(tr('Загрузить форматы'), "search", callback=self.lookup)
         row = QHBoxLayout()
         row.addWidget(self.link, 1)
         row.addWidget(self.lookup_button)
         link_panel.addLayout(row)
-        link_panel.addWidget(label("При первом использовании приложение скачает компоненты (около 166 МБ).",
+        link_panel.addWidget(label(tr('При первом использовании приложение скачает компоненты (около 166 МБ).'),
                                    "muted", True))
         layout.addWidget(frame)
 
         self.options, format_panel = panel()
         self.title = label("", "sectionTitle", True)
         format_panel.addWidget(self.title)
-        self.advanced = QCheckBox("Расширенный режим")
+        self.advanced = QCheckBox(tr('Расширенный режим'))
         format_panel.addWidget(self.advanced)
         self.form = QFormLayout()
         self.kind = QComboBox()
-        self.kind.addItem("Видео", "video")
-        self.kind.addItem("Только аудио", "audio")
+        self.kind.addItem(tr('Видео'), "video")
+        self.kind.addItem(tr('Только аудио'), "audio")
         self.advanced_kind = QComboBox()
-        self.advanced_kind.addItem("Исходный поток YouTube", "stream")
-        self.advanced_kind.addItem("Конвертация FFmpeg", "convert")
+        self.advanced_kind.addItem(tr('Исходный поток YouTube'), "stream")
+        self.advanced_kind.addItem(tr('Конвертация FFmpeg'), "convert")
         self.format = QComboBox()
         self.stream = QComboBox()
         self.muxer = QComboBox()
@@ -83,9 +84,9 @@ class YouTubePage(QWidget):
         self.video_codec = QComboBox()
         self.audio_codec = QComboBox()
         self.quality = QComboBox()
-        for title, widget in (("Тип файла", self.kind), ("Режим", self.advanced_kind), ("Формат", self.format),
-                              ("Поток", self.stream), ("Контейнер", self.muxer), ("Кодек видео", self.video_codec),
-                              ("Кодек аудио", self.audio_codec), ("Разрешение", self.quality)):
+        for title, widget in ((tr('Тип файла'), self.kind), (tr('Режим'), self.advanced_kind), (tr('Формат'), self.format),
+                              (tr('Поток'), self.stream), (tr('Контейнер'), self.muxer), (tr('Кодек видео'), self.video_codec),
+                              (tr('Кодек аудио'), self.audio_codec), (tr('Разрешение'), self.quality)):
             widget.setAccessibleName(title)
             self.form.addRow(title, widget)
 
@@ -93,12 +94,12 @@ class YouTubePage(QWidget):
         directory = context.store.setting("youtube_download_dir", downloads or str(Path.home() / "Downloads"))
         folder_row = QHBoxLayout()
         self.directory = QLineEdit(directory, readOnly=True)
-        self.directory.setAccessibleName("Папка для скачивания")
+        self.directory.setAccessibleName(tr('Папка для скачивания'))
         folder_row.addWidget(self.directory, 1)
-        folder_row.addWidget(button("Выбрать…", "folder", callback=self.choose_folder))
-        self.form.addRow("Папка", folder_row)
+        folder_row.addWidget(button(tr('Выбрать…'), "folder", callback=self.choose_folder))
+        self.form.addRow(tr('Папка'), folder_row)
         format_panel.addLayout(self.form)
-        self.download_button = button("Скачать", "save", True, self.start_download)
+        self.download_button = button(tr('Скачать'), "save", True, self.start_download)
         format_panel.addWidget(self.download_button)
         layout.addWidget(self.options)
         self.options.hide()
@@ -111,14 +112,14 @@ class YouTubePage(QWidget):
         self.result_controls = QWidget()
         actions = QHBoxLayout(self.result_controls)
         actions.setContentsMargins(0, 0, 0, 0)
-        self.open_folder_button = button("Открыть папку", "folder", callback=self.open_folder)
-        self.transcribe_button = button("Добавить в расшифровку", "audio", callback=self.transcribe)
+        self.open_folder_button = button(tr('Открыть папку'), "folder", callback=self.open_folder)
+        self.transcribe_button = button(tr('Добавить в расшифровку'), "audio", callback=self.transcribe)
         actions.addWidget(self.open_folder_button)
         actions.addWidget(self.transcribe_button)
         actions.addStretch()
         self.result_controls.hide()
         layout.addWidget(self.result_controls)
-        self.cancel_button = button("Отменить", "stop", callback=self.cancel)
+        self.cancel_button = button(tr('Отменить'), "stop", callback=self.cancel)
         self.cancel_button.hide()
         layout.addWidget(self.cancel_button)
         layout.addStretch()
@@ -157,21 +158,21 @@ class YouTubePage(QWidget):
         self.kind.model().item(1).setEnabled(video.has_audio)
         self.kind.setCurrentIndex(0 if any(s.video for s in video.streams) else 1)
         self.quality.clear()
-        self.quality.addItem("Лучшее доступное", None)
+        self.quality.addItem(tr('Лучшее доступное'), None)
         for height in video.resolutions:
             self.quality.addItem(f"{height}p", height)
         self.stream.clear()
         for stream in video.streams:
             parts = [stream.extension.upper()]
             if stream.video:
-                parts.extend((f"{stream.width}×{stream.height}" if stream.width and stream.height else "Видео",
+                parts.extend((f"{stream.width}×{stream.height}" if stream.width and stream.height else tr('Видео'),
                               stream.video))
                 if stream.fps:
-                    parts.append(f"{stream.fps:g} кадр/с")
+                    parts.append(tr('{0:g} кадр/с', stream.fps))
             if stream.audio:
                 parts.append(stream.audio)
             if stream.bitrate:
-                parts.append(f"{stream.bitrate:.0f} кбит/с")
+                parts.append(tr('{0:.0f} кбит/с', stream.bitrate))
             if stream.language:
                 parts.append(stream.language)
             parts.append(f"#{stream.id}")
@@ -202,7 +203,7 @@ class YouTubePage(QWidget):
         ):
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("Исключить дорожку", "")
+            combo.addItem(tr('Исключить дорожку'), "")
             if available:
                 for codec in choices:
                     combo.addItem(codec, codec)
@@ -241,7 +242,7 @@ class YouTubePage(QWidget):
         return None
 
     def choose_folder(self):
-        path = QFileDialog.getExistingDirectory(self, "Куда сохранить файл", self.directory.text())
+        path = QFileDialog.getExistingDirectory(self, tr('Куда сохранить файл'), self.directory.text())
         if path:
             self.directory.setText(path)
             self.context.store.set_setting("youtube_download_dir", path)
@@ -254,14 +255,14 @@ class YouTubePage(QWidget):
             destination.mkdir(parents=True, exist_ok=True)
             self.work_dir = Path(tempfile.mkdtemp(prefix=".item40-youtube-", dir=destination))
         except OSError as error:
-            self.status.setText(f"Не удалось подготовить папку для сохранения. {error}")
+            self.status.setText(tr('Не удалось подготовить папку для сохранения. {0}', error))
             return
         self.start_task((self.video, selection, self.work_dir))
 
     def start_task(self, request=None):
         self.result_controls.hide()
         self.result = None
-        self.status.setText("Подготовка…")
+        self.status.setText(tr('Подготовка…'))
         self.progress.setRange(0, 0)
         self.progress.show()
         self.cancel_button.setEnabled(True)
@@ -276,7 +277,7 @@ class YouTubePage(QWidget):
         try:
             self.process.start()
         except (OSError, RuntimeError) as error:
-            self.finish("failed", error=f"Не удалось запустить загрузку. {error}")
+            self.finish("failed", error=tr('Не удалось запустить загрузку. {0}', error))
             return
         self.timer.start()
 
@@ -284,7 +285,7 @@ class YouTubePage(QWidget):
         if self.process and self.cancel_time is None:
             self.cancel_event.set()
             self.cancel_time = time.monotonic()
-            self.status.setText("Отмена…")
+            self.status.setText(tr('Отмена…'))
             self.cancel_button.setEnabled(False)
 
     def poll(self):
@@ -310,7 +311,7 @@ class YouTubePage(QWidget):
                 self.dead_since = now
             elif now - self.dead_since > 0.5:
                 self.finish("cancelled" if self.cancel_time is not None else "failed",
-                            error="Процесс загрузки завершился неожиданно. Повторите попытку.")
+                            error=tr('Процесс загрузки завершился неожиданно. Повторите попытку.'))
 
     def finish(self, kind, **values):
         self.stop_process()
@@ -319,11 +320,11 @@ class YouTubePage(QWidget):
             try:
                 self.result = save_download(values["source"], self.video.title)
             except OSError as error:
-                self.status.setText(f"Не удалось сохранить файл. {error}")
+                self.status.setText(tr('Не удалось сохранить файл. {0}', error))
             else:
-                self.status.setText(f"Сохранено · {self.result.name}")
+                self.status.setText(tr('Сохранено · {0}', self.result.name))
                 if not values["readable_audio"] and self.selection_has_audio():
-                    self.status.setText(self.status.text() + " · Для расшифровки выберите WAV или MP3.")
+                    self.status.setText(self.status.text() + tr(' · Для расшифровки выберите WAV или MP3.'))
                 self.transcribe_button.setVisible(values["readable_audio"])
                 self.result_controls.show()
                 if not self.isVisible():
@@ -332,7 +333,7 @@ class YouTubePage(QWidget):
             self.load_formats(values["video"], values["muxers"])
             self.status.clear()
         elif kind == "cancelled":
-            self.status.setText("Отменено")
+            self.status.setText(tr('Отменено'))
         else:
             self.status.setText(values["error"])
         self.cleanup()
@@ -355,7 +356,7 @@ class YouTubePage(QWidget):
             self.context.open_tool("audio.transcribe")
             self.context.tool_views["audio.transcribe"].add_files([str(self.result)])
         else:
-            self.status.setText("Файл перемещён или удалён.")
+            self.status.setText(tr('Файл перемещён или удалён.'))
 
     def stop_process(self):
         self.timer.stop()

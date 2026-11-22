@@ -67,6 +67,10 @@ QListWidget { background: transparent; border: none; outline: none; }
 QListWidget::item { border-bottom: 1px solid #333333; padding: 10px 6px; }
 QListWidget::item:selected { background: #353535; color: #ffffff; }
 QListWidget::item:hover { background: #292929; }
+QTreeWidget { background: #1b1b1b; border: 1px solid #383838; outline: none; }
+QTreeWidget::item { padding: 7px 4px; border-bottom: 1px solid #2d2d2d; }
+QTreeWidget::item:selected { background: #353535; color: #ffffff; }
+QHeaderView::section { background: #242424; border: none; border-bottom: 1px solid #494949; padding: 7px 4px; }
 QProgressBar { border: none; background: #353535; height: 3px; max-height: 3px; }
 QProgressBar::chunk { background: #bbbbbb; }
 QScrollBar:vertical { width: 7px; background: transparent; }

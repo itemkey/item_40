@@ -7,6 +7,8 @@ import tempfile
 from ctypes import wintypes as wt
 from pathlib import Path
 
+from .i18n import tr
+
 
 class Blob(ct.Structure):
     _fields_ = [("size", wt.DWORD), ("data", ct.POINTER(ct.c_ubyte))]
@@ -14,7 +16,7 @@ class Blob(ct.Structure):
 
 def protect(data: bytes, *, decrypt=False) -> bytes:
     if os.name != "nt":
-        raise OSError("Сохранение токена поддерживается в Windows.")
+        raise OSError(tr('Сохранение токена поддерживается в Windows.'))
     crypt = ct.WinDLL("crypt32", use_last_error=True)
     kernel = ct.WinDLL("kernel32", use_last_error=True)
     function = crypt.CryptUnprotectData if decrypt else crypt.CryptProtectData
@@ -26,7 +28,7 @@ def protect(data: bytes, *, decrypt=False) -> bytes:
     buffer = (ct.c_ubyte * len(data)).from_buffer_copy(data)
     source, target = Blob(len(data), buffer), Blob()
     if not function(ct.byref(source), None, None, None, None, 1, ct.byref(target)):
-        raise OSError("Не удалось открыть или сохранить подключение Telegram в этом профиле Windows.")
+        raise OSError(tr('Не удалось открыть или сохранить подключение Telegram в этом профиле Windows.'))
     try:
         return ct.string_at(target.data, target.size)
     finally:
@@ -60,7 +62,7 @@ def load_connection(root: Path) -> tuple[str, str] | None:
             raise ValueError
         return saved["token"], saved["username"]
     except (OSError, ValueError, KeyError, TypeError):
-        raise OSError("Не удалось прочитать сохранённое подключение Telegram. Подключите бота заново.") from None
+        raise OSError(tr('Не удалось прочитать сохранённое подключение Telegram. Подключите бота заново.')) from None
 
 
 def forget_connection(root: Path):

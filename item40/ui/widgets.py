@@ -3,6 +3,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
+from ..i18n import tr
 from .theme import icon
 
 
@@ -50,10 +51,10 @@ class DropZone(QFrame):
         layout = QVBoxLayout(self)
         layout.setSpacing(6)
         layout.setContentsMargins(12, 12, 12, 12)
-        title = label("Добавить аудиофайлы")
+        title = label(tr('Добавить аудиофайлы'))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
-        formats = label("M4A, MP3, WAV, FLAC и другие", "muted", True)
+        formats = label(tr('M4A, MP3, WAV, FLAC и другие'), "muted", True)
         formats.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(formats)
 
