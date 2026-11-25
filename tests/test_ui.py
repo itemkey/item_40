@@ -135,6 +135,45 @@ def test_add_multiple_files_and_cancel_queued_job(qtbot, tmp_path):
     window.close()
 
 
+def test_telegram_stickers_use_pack_links_selection_and_converter(qtbot, tmp_path, monkeypatch):
+    window = make_window(qtbot, tmp_path)
+    window.open_tool(TELEGRAM_TOOL_ID)
+    page = window.tool_views[TELEGRAM_TOOL_ID]
+    page.token, page.username = "123456:TEST_ONLY_TOKEN", "test_bot"
+    page.update_connection()
+    requests = []
+
+    def start_task(action, params, token=None):
+        requests.append((action, params))
+        page.action = action
+
+    monkeypatch.setattr(page, "start_task", start_task)
+    page.link.setText("https://t.me/addstickers/TestStickers")
+    page.lookup()
+    assert requests[-1] == ("inspect", {"name": "TestStickers"})
+    stickers = [Emoji(f"AgAD_{i}-AbC", i, f"file-{i}", "webp", "", 12, None) for i in (1, 2)]
+    page.load_pack(EmojiPack("TestStickers", "Тест", stickers, "regular"))
+    assert "стикеров" in page.pack_title.text()
+    page.directory.setText(str(tmp_path))
+    page.items["AgAD_2-AbC"].setSelected(True)
+    page.download_selected()
+    assert requests[-1][0] == "download"
+    assert requests[-1][1]["emojis"] == stickers[1:]
+    assert requests[-1][1]["sticker_type"] == "regular"
+    result = page.output_folder / "002_AgAD_2-AbC.webp"
+    result.write_bytes(b"original")
+    page.handle_event("saved", {"id": "AgAD_2-AbC", "path": result})
+    page.finish("completed")
+    monkeypatch.setattr("item40.ui.converter_page.ConverterPage.add_files",
+                        lambda self, paths: requests.append(paths))
+    QTest.mouseClick(page.convert_button, Qt.MouseButton.LeftButton)
+    assert requests[-1] == [str(result)]
+    assert window.stack.currentWidget() is window.tool_views["files.convert"]
+    page.link.setText("tg://addemoji?set=TestEmoji")
+    assert page.pack is None and not page.saved and page.grid.count() == 0
+    window.close()
+
+
 def test_primary_action_stays_visible_in_small_window(qtbot, tmp_path):
     window = make_window(qtbot, tmp_path)
     window.resize(1080, 760)

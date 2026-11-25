@@ -103,6 +103,7 @@ def smoke_test(request, report_path):
     def finish(error=""):
         timer.stop()
         report = {"error": error, "mock_api": bool(request.get("telegram_fixture")),
+                  "sticker_type": page.pack.sticker_type if page.pack else None,
                   "saved": [str(path) for path in page.saved.values()], "screenshots": snapshots}
         if not error and request.get("telegram_fixture"):
             report["connection_saved"] = load_connection(root) == ("123456:FIXTURE_ONLY_TOKEN", "fixture_bot")
@@ -129,7 +130,7 @@ def smoke_test(request, report_path):
             if page.pack is None:
                 finish(page.status.text())
                 return
-            identities = request.get("emoji_ids", [emoji.id for emoji in page.pack.emojis[:3]])
+            identities = request.get("sticker_ids", request.get("emoji_ids", [emoji.id for emoji in page.pack.emojis[:3]]))
             for identity in identities:
                 page.items[identity].setSelected(True)
             capture("selected")

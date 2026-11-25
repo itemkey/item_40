@@ -51,14 +51,19 @@ def drain(events):
 @pytest.mark.parametrize("link", [
     "https://t.me/addemoji/TestEmoji", " t.me/addemoji/TestEmoji ",
     "https://telegram.me/addemoji/TestEmoji?foo=1", "tg://addemoji?set=TestEmoji",
+    "https://t.me/addstickers/TestEmoji", " t.me/addstickers/TestEmoji ",
+    "https://telegram.me/addstickers/TestEmoji?foo=1", "tg://addstickers?set=TestEmoji",
+    "https://telegram.dog/addstickers/TestEmoji/",
 ])
 def test_pack_links(link):
     assert pack_name(link) == "TestEmoji"
 
 
 @pytest.mark.parametrize("link", [
-    "https://t.me/addstickers/TestEmoji", "https://t.me.evil.com/addemoji/TestEmoji",
+    "https://t.me/SomeUser", "https://t.me.evil.com/addemoji/TestEmoji",
     "https://user@t.me/addemoji/TestEmoji", "https://t.me/addemoji/../file", "tg://resolve?domain=TestEmoji",
+    "https://t.me.evil.com/addstickers/TestEmoji", "tg://addstickers?set=../file",
+    "https://t.me:443/addstickers/TestEmoji", "https://t.me/addstickers/TestEmoji/extra",
 ])
 def test_other_links_are_rejected(link):
     with pytest.raises(ValueError):
@@ -70,7 +75,58 @@ def test_pack_preserves_original_types_and_order():
     assert [(emoji.id, emoji.position, emoji.kind) for emoji in pack.emojis] == [
         ("1", 1, "webp"), ("2", 2, "tgs"), ("3", 3, "webm")]
     with pytest.raises(TelegramError, match="тип набора"):
-        parse_pack({"sticker_type": "regular"})
+        parse_pack({"sticker_type": "unknown"})
+
+
+@pytest.mark.parametrize("sticker_type", ["regular", "mask"])
+def test_sticker_sets_do_not_require_custom_emoji_ids(sticker_type):
+    result = sticker_set()
+    result["sticker_type"] = sticker_type
+    for index, sticker in enumerate(result["stickers"], 1):
+        sticker.pop("custom_emoji_id")
+        sticker["file_unique_id"] = f"AgAD_{index}-AbC"
+    pack = parse_pack(result)
+    assert pack.sticker_type == sticker_type
+    assert [(sticker.id, sticker.position, sticker.kind) for sticker in pack.emojis] == [
+        ("AgAD_1-AbC", 1, "webp"), ("AgAD_2-AbC", 2, "tgs"), ("AgAD_3-AbC", 3, "webm")]
+
+
+@pytest.mark.parametrize("identity", [None, "", "../outside", "a/b", "a\\b"])
+def test_incomplete_or_unsafe_sticker_identifiers_are_rejected(identity):
+    result = sticker_set()
+    result["sticker_type"] = "regular"
+    result["stickers"][0]["file_unique_id"] = identity
+    with pytest.raises(TelegramError, match="неполные сведения"):
+        parse_pack(result)
+
+
+def test_selected_stickers_download_originals_with_non_numeric_ids(tmp_path, monkeypatch):
+    result = sticker_set()
+    result["sticker_type"] = "regular"
+    for index, sticker in enumerate(result["stickers"], 1):
+        sticker.pop("custom_emoji_id")
+        sticker["file_unique_id"] = f"AgAD_{index}-AbC"
+    pack = parse_pack(result)
+    work = tmp_path / pack.name / ".work"
+    work.mkdir(parents=True)
+    requested = []
+    originals = {"file-1": WEBP, "file-2": TGS, "file-3": WEBM}
+
+    def fetch(self, file_id, destination, **kwargs):
+        requested.append(file_id)
+        destination.write_bytes(originals[file_id])
+
+    monkeypatch.setattr(TelegramAPI, "fetch", fetch)
+    events = Queue()
+    worker(tmp_path, TOKEN, "download", {"emojis": pack.emojis[1:], "folder": work,
+                                       "sticker_type": pack.sticker_type}, events, Event())
+    messages = drain(events)
+    assert requested == ["file-2", "file-3"]
+    assert (work.parent / "002_AgAD_2-AbC.tgs").read_bytes() == TGS
+    assert (work.parent / "003_AgAD_3-AbC.webm").read_bytes() == WEBM
+    assert not (work.parent / "001_AgAD_1-AbC.webp").exists()
+    assert [values["id"] for kind, values in messages if kind == "saved"] == ["AgAD_2-AbC", "AgAD_3-AbC"]
+    assert messages[-1][0] == "completed"
 
 
 def test_selected_originals_and_retry_do_not_overwrite(tmp_path, monkeypatch):

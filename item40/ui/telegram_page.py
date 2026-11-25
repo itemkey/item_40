@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..i18n import tr
+from ..i18n import language, tr
 from ..telegram import pack_name, thumbnail_cache, worker
 from ..telegram_credentials import forget_connection, load_connection, save_connection
 from .widgets import button, heading, label, panel
@@ -56,7 +56,8 @@ class TelegramPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
-        layout.addWidget(heading(tr('Скачать эмодзи'), tr('Выберите эмодзи из пака Telegram и сохраните оригиналы.')))
+        layout.addWidget(heading(tr('Скачать эмодзи и стикеры'),
+                                 tr('Выберите эмодзи или стикеры из набора Telegram и сохраните оригиналы.')))
         self.connection, connection_layout = panel()
         self.connected_row = QWidget()
         connected_layout = QHBoxLayout(self.connected_row)
@@ -84,8 +85,8 @@ class TelegramPage(QWidget):
         self.link_controls = QWidget()
         links = QHBoxLayout(self.link_controls)
         links.setContentsMargins(0, 0, 0, 0)
-        self.link = QLineEdit(placeholderText=tr('https://t.me/addemoji/НазваниеПака'))
-        self.link.setAccessibleName(tr('Ссылка на эмодзи-пак'))
+        self.link = QLineEdit(placeholderText=tr('t.me/addstickers/НазваниеПака или t.me/addemoji/НазваниеПака'))
+        self.link.setAccessibleName(tr('Ссылка на набор эмодзи или стикеров'))
         self.link.returnPressed.connect(self.lookup)
         self.link.textChanged.connect(self.reset_pack)
         self.lookup_button = button(tr('Загрузить пак'), "search", callback=self.lookup)
@@ -105,7 +106,7 @@ class TelegramPage(QWidget):
         title_row.addWidget(self.select_none)
         pack_layout.addLayout(title_row)
         self.grid = QListWidget()
-        self.grid.setAccessibleName(tr('Эмодзи пака. Щёлкните для выбора или снятия выделения.'))
+        self.grid.setAccessibleName(tr('Эмодзи и стикеры набора. Щёлкните для выбора или снятия выделения.'))
         self.grid.setViewMode(QListView.ViewMode.IconMode)
         self.grid.setResizeMode(QListView.ResizeMode.Adjust)
         self.grid.setMovement(QListView.Movement.Static)
@@ -122,7 +123,7 @@ class TelegramPage(QWidget):
         downloads = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
         directory = context.store.setting("telegram_download_dir", downloads or str(Path.home() / "Downloads"))
         self.directory = QLineEdit(directory, readOnly=True)
-        self.directory.setAccessibleName(tr('Папка для эмодзи'))
+        self.directory.setAccessibleName(tr('Папка для эмодзи и стикеров'))
         folder_row.addWidget(self.directory, 1)
         self.choose_folder_button = button(tr('Выбрать папку…'), "folder", callback=self.choose_folder)
         folder_row.addWidget(self.choose_folder_button)
@@ -214,7 +215,9 @@ class TelegramPage(QWidget):
 
     def load_pack(self, pack):
         self.pack = pack
-        self.pack_title.setText(tr('{0} · {1} эмодзи', pack.title, len(pack.emojis)))
+        self.pack_title.setText(tr('{0} · {1} эмодзи', pack.title, len(pack.emojis))
+                                if pack.sticker_type == "custom_emoji"
+                                else tr('{0} · {1} стикеров', pack.title, len(pack.emojis)))
         self.grid.clear()
         self.items = {}
         for emoji in pack.emojis:
@@ -250,7 +253,7 @@ class TelegramPage(QWidget):
                                         and self.pending_download is None)
 
     def choose_folder(self):
-        directory = QFileDialog.getExistingDirectory(self, tr('Куда сохранить эмодзи'), self.directory.text())
+        directory = QFileDialog.getExistingDirectory(self, tr('Куда сохранить эмодзи и стикеры'), self.directory.text())
         if directory:
             self.directory.setText(directory)
             self.context.store.set_setting("telegram_download_dir", directory)
@@ -285,12 +288,14 @@ class TelegramPage(QWidget):
         self.requested = emojis
         for emoji in emojis:
             self.failed.pop(emoji.id, None)
-        self.start_task("download", {"emojis": emojis, "folder": self.work_dir})
+        self.start_task("download", {"emojis": emojis, "folder": self.work_dir,
+                                     "sticker_type": self.pack.sticker_type})
 
     def start_task(self, action, params, token=None):
         self.action = action
-        self.status.setText({"connect": tr('Подключение бота…'), "inspect": tr('Получение эмодзи-пака…'),
-                             "download": tr('Скачивание эмодзи…')}[action])
+        self.status.setText({"connect": tr('Подключение бота…'), "inspect": tr('Получение набора Telegram…'),
+                             "download": tr('Скачивание выбранных эмодзи или стикеров…')}[action])
+        params = {**params, "ui_language": language()}
         self.events = self.mp.Queue()
         self.cancel_event = self.mp.Event()
         self.process = self.mp.Process(target=worker, args=(self.context.root, token or self.token, action,
@@ -391,7 +396,7 @@ class TelegramPage(QWidget):
         elif kind == "cancelled":
             self.status.setText(tr('Отменено'))
         else:
-            self.status.setText(tr('Выберите эмодзи для скачивания.'))
+            self.status.setText(tr('Выберите эмодзи или стикеры для скачивания.'))
         self.pending_token = ""
         self.cleanup()
         if values.get("auth"):

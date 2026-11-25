@@ -7,10 +7,10 @@ from pathlib import Path
 
 def smoke_test(request_path, report_path):
     request = json.loads(Path(request_path).read_text(encoding="utf-8-sig"))
-    if "conversion_files" in request or "soundcloud_url" in request:
-        from .i18n import selected_language, set_language
+    from .i18n import selected_language, set_language
 
-        set_language(request.get("ui_language", selected_language()))
+    set_language(request.get("ui_language", selected_language()))
+    if "conversion_files" in request or "soundcloud_url" in request:
         from .conversion_diagnostics import smoke_test as conversion_smoke_test
 
         return conversion_smoke_test(request, report_path)

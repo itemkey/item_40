@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import requests
 
 from .downloads import Cancelled, check_cancel
-from .i18n import tr
+from .i18n import set_language, tr
 
 TOOL_ID = "telegram.emoji"
 MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -32,6 +32,7 @@ class EmojiPack:
     name: str
     title: str
     emojis: list[Emoji]
+    sticker_type: str = "custom_emoji"
 
 
 class TelegramError(RuntimeError):
@@ -50,8 +51,8 @@ def pack_name(value: str) -> str:
             raise ValueError
         path = url.path.strip("/").split("/")
         if url.scheme in {"http", "https"} and url.hostname in {"t.me", "telegram.me", "telegram.dog"}:
-            name = path[1] if len(path) == 2 and path[0] == "addemoji" else ""
-        elif url.scheme == "tg" and url.hostname == "addemoji" and not url.path.strip("/"):
+            name = path[1] if len(path) == 2 and path[0] in {"addemoji", "addstickers"} else ""
+        elif url.scheme == "tg" and url.hostname in {"addemoji", "addstickers"} and not url.path.strip("/"):
             name = parse_qs(url.query).get("set", [""])[0]
         else:
             name = ""
@@ -59,28 +60,31 @@ def pack_name(value: str) -> str:
             raise ValueError
         return name
     except ValueError:
-        raise ValueError(tr('Вставьте ссылку на эмодзи-пак вида t.me/addemoji/НазваниеПака.')) from None
+        raise ValueError(tr('Вставьте ссылку на набор: t.me/addemoji/НазваниеПака или t.me/addstickers/НазваниеПака.')) from None
 
 
 def parse_pack(result: dict) -> EmojiPack:
-    if result.get("sticker_type") != "custom_emoji":
-        raise TelegramError(tr('Эта ссылка ведёт на другой тип набора. Выберите эмодзи-пак Telegram.'))
+    sticker_type = result.get("sticker_type")
+    if sticker_type not in {"custom_emoji", "regular", "mask"}:
+        raise TelegramError(tr('Неизвестный тип набора. Выберите набор эмодзи или стикеров Telegram.'))
     name = result.get("name", "")
     if not re.fullmatch(r"[a-zA-Z0-9_]{1,128}", name):
         raise TelegramError(tr('Telegram вернул некорректное название пака.'))
     emojis = []
     for position, sticker in enumerate(result.get("stickers", []), 1):
-        identity = sticker.get("custom_emoji_id", "")
+        identity = sticker.get("custom_emoji_id" if sticker_type == "custom_emoji" else "file_unique_id")
         file_id = sticker.get("file_id")
-        if not re.fullmatch(r"[0-9]{1,32}", identity) or not isinstance(file_id, str) or not file_id:
-            raise TelegramError(tr('Telegram вернул неполные сведения об эмодзи. Загрузите пак ещё раз.'))
+        identity_pattern = r"[0-9]{1,32}" if sticker_type == "custom_emoji" else r"[a-zA-Z0-9_-]{1,128}"
+        if (not isinstance(identity, str) or not re.fullmatch(identity_pattern, identity)
+                or not isinstance(file_id, str) or not file_id):
+            raise TelegramError(tr('Telegram вернул неполные сведения об эмодзи или стикере. Загрузите набор ещё раз.'))
         kind = "tgs" if sticker.get("is_animated") else "webm" if sticker.get("is_video") else "webp"
         thumbnail = sticker.get("thumbnail") or {}
         emojis.append(Emoji(identity, position, file_id, kind, sticker.get("emoji") or "",
                             sticker.get("file_size"), thumbnail.get("file_id")))
     if not emojis:
-        raise TelegramError(tr('В этом паке пока нет эмодзи.'))
-    return EmojiPack(name, result.get("title") or name, emojis)
+        raise TelegramError(tr('В этом наборе пока нет эмодзи или стикеров.'))
+    return EmojiPack(name, result.get("title") or name, emojis, sticker_type)
 
 
 def file_extension(header: bytes, kind: str) -> str:
@@ -137,7 +141,7 @@ class TelegramAPI:
                     if response.status_code in {401, 404}:
                         raise TelegramError(tr('Токен бота недействителен. Подключите бота заново.'), auth=True)
                     if response.status_code != 200:
-                        message = (tr('Эмодзи-пак не найден или недоступен. Проверьте ссылку.')
+                        message = (tr('Набор не найден или недоступен. Проверьте ссылку.')
                                    if method == "getStickerSet" else tr('Telegram не смог предоставить этот файл.'))
                         raise TelegramError(message)
                     data = response.json()
@@ -217,6 +221,9 @@ def save_original(source: Path, emoji: Emoji) -> Path:
 
 
 def worker(root, token, action, params, events, cancel):
+    if code := params.get("ui_language"):
+        set_language(code)
+
     def emit(kind, **values):
         events.put((kind, values))
 
@@ -254,7 +261,10 @@ def worker(root, token, action, params, events, cancel):
             emojis, folder = params["emojis"], Path(params["folder"])
             for index, emoji in enumerate(emojis):
                 check_cancel(cancel)
-                emit("progress", stage=tr('Скачивание эмодзи · {0} из {1}', index + 1, len(emojis)),
+                stage = (tr('Скачивание эмодзи · {0} из {1}', index + 1, len(emojis))
+                         if params.get("sticker_type", "custom_emoji") == "custom_emoji"
+                         else tr('Скачивание стикеров · {0} из {1}', index + 1, len(emojis)))
+                emit("progress", stage=stage,
                      progress=index / len(emojis))
                 temporary = folder / f"{emoji.id}.part"
                 try:
