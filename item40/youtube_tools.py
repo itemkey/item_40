@@ -52,7 +52,7 @@ def ensure_tools(root: Path, emit, cancel, names=None) -> list[Path]:
             continue
         ready.unlink(missing_ok=True)
         archive = folder / package.file
-        stage = tr('Подготовка YouTube · {0}', package.name)
+        stage = tr('Подготовка компонента · {0}', package.name)
         emit("progress", stage=stage, progress=None)
         try:
             download_file(package.url, archive, package.sha256, emit, cancel, label=stage)

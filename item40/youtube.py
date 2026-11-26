@@ -134,7 +134,7 @@ def video_metadata(info: dict, service="YouTube") -> Video:
                               item.get("fps"), item.get("tbr") or item.get("abr"), item.get("language")))
     if not streams:
         raise ValueError(tr('{0}: доступные потоки отсутствуют.', service))
-    return Video(info.get("title") or info.get("id") or "YouTube", info.get("duration"), streams)
+    return Video(info.get("title") or info.get("id") or service, info.get("duration"), streams)
 
 
 def save_download(source: Path, title: str, extension=None, *, directory=None) -> Path:
@@ -239,9 +239,10 @@ def run_tool(args, cancel, on_line=None, *, cwd=None, extra_path=None):
     return "".join(result)
 
 
-def ytdlp_args(tools, *, playlist=False):
+def ytdlp_args(tools, *, playlist=False, extractors=None):
     ytdlp, deno, ffmpeg = tools
     return [ytdlp / "yt-dlp.exe", "--ignore-config", "--no-plugin-dirs", *( [] if playlist else ["--no-playlist"]),
+            *(["--use-extractors", extractors] if extractors else []),
             "--encoding", "utf-8", "--socket-timeout", "20", "--abort-on-unavailable-fragments",
             "--no-js-runtimes", "--js-runtimes", f"deno:{deno / 'deno.exe'}",
             "--ffmpeg-location", ffmpeg]
@@ -253,7 +254,8 @@ def inspect(url, tools, emit, cancel):
     return video_metadata(json.loads(result)), ffmpeg_formats(tools[2])
 
 
-def download(url, video, selection, folder, tools, emit, cancel, *, service="YouTube", metadata=False):
+def download(url, video, selection, folder, tools, emit, cancel, *, service="YouTube", metadata=False,
+             extractors=None):
     emit("progress", stage=tr('Скачивание · {0}', service), progress=None)
     files = []
 
@@ -268,7 +270,7 @@ def download(url, video, selection, folder, tools, emit, cancel, *, service="You
             emit("progress", stage=tr('{0} · {1:.1f} МБ', service, done / 1e6), progress=fraction)
 
     options = ["--fixup", "never"] if selection.stream else ["--merge-output-format", "mkv"]
-    run_tool([*ytdlp_args(tools), "-f", selection.selector(video.has_audio), *options,
+    run_tool([*ytdlp_args(tools, extractors=extractors), "-f", selection.selector(video.has_audio), *options,
               "--no-simulate", "--progress", "--newline", "--progress-delta", "0.2",
               "--progress-template", "download:progress:%(progress)j", "--print", "after_move:file:%(filepath)j",
               *(["--embed-metadata"] if metadata else []),

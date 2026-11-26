@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
             self.tool_views[TOOL_ID].shutdown()
         if TELEGRAM_TOOL_ID in self.tool_views:
             self.tool_views[TELEGRAM_TOOL_ID].shutdown()
-        for key in ("files.convert", "soundcloud.download"):
+        for key in ("files.convert", "soundcloud.download", "tiktok.download"):
             if key in self.tool_views:
                 self.tool_views[key].shutdown()
         self.manager.shutdown()

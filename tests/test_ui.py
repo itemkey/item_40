@@ -1,3 +1,4 @@
+import pytest
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 
@@ -6,6 +7,7 @@ from item40.jobs import JobManager
 from item40.storage import Store
 from item40.telegram import TOOL_ID as TELEGRAM_TOOL_ID
 from item40.telegram import Emoji, EmojiPack
+from item40.tiktok import TOOL_ID as TIKTOK_TOOL_ID
 from item40.ui.theme import STYLE
 from item40.ui.window import MainWindow
 from item40.youtube import TOOL_ID, Stream, Video
@@ -53,10 +55,11 @@ def test_catalog_navigation_and_no_results(qtbot, tmp_path):
     window.close()
 
 
-def test_youtube_cancel_and_send_completed_file_to_transcription(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("tool_id", [TOOL_ID, TIKTOK_TOOL_ID])
+def test_video_download_cancel_and_send_completed_file_to_transcription(qtbot, tmp_path, monkeypatch, tool_id):
     window = make_window(qtbot, tmp_path)
-    window.open_tool(TOOL_ID)
-    page = window.tool_views[TOOL_ID]
+    window.open_tool(tool_id)
+    page = window.tool_views[tool_id]
     page.directory.setText(str(tmp_path))
     page.load_formats(Video("Тест", 5, [Stream("18", "mp4", "avc1", "aac", 640, 360, 30, 500, None)]), [])
     monkeypatch.setattr(page, "start_task", lambda request: None)
@@ -79,6 +82,42 @@ def test_youtube_cancel_and_send_completed_file_to_transcription(qtbot, tmp_path
     assert window.stack.currentWidget() is window.tool_views["audio.transcribe"]
     assert window.store.pending()[0]["source"] == str(page.result)
     window.close()
+
+
+def test_tiktok_lookup_and_download_folder_are_independent_of_youtube(qtbot, tmp_path, monkeypatch):
+    window = make_window(qtbot, tmp_path)
+    window.store.set_setting("youtube_download_dir", str(tmp_path / "youtube"))
+    window.store.set_setting("tiktok_download_dir", str(tmp_path / "tiktok"))
+    window.open_tool(TIKTOK_TOOL_ID)
+    page = window.tool_views[TIKTOK_TOOL_ID]
+    assert page.directory.text() == str(tmp_path / "tiktok")
+    assert page.link.accessibleName() == "Ссылка на ролик TikTok"
+    requests = []
+    monkeypatch.setattr(page, "start_task", lambda: requests.append(page.url))
+    page.link.setText("https://www.youtube.com/watch?v=aqz-KE-bpKQ")
+    page.lookup()
+    assert not requests and "TikTok" in page.status.text()
+    page.link.setText("https://vt.tiktok.com/token/?share=1")
+    page.lookup()
+    assert requests == ["https://vt.tiktok.com/token/"]
+    monkeypatch.setattr("item40.ui.video_download_page.QFileDialog.getExistingDirectory",
+                        lambda *args: str(tmp_path / "chosen"))
+    page.choose_folder()
+    assert window.store.setting("tiktok_download_dir") == str(tmp_path / "chosen")
+    assert window.store.setting("youtube_download_dir") == str(tmp_path / "youtube")
+    window.close()
+
+
+def test_closing_window_cleans_up_tiktok_download(qtbot, tmp_path):
+    window = make_window(qtbot, tmp_path)
+    window.open_tool(TIKTOK_TOOL_ID)
+    page = window.tool_views[TIKTOK_TOOL_ID]
+    page.work_dir = tmp_path / ".item40-tiktok-test"
+    page.work_dir.mkdir()
+    (page.work_dir / "source.mp4.part").write_bytes(b"partial")
+    work = page.work_dir
+    window.close()
+    assert not work.exists()
 
 
 def test_telegram_selection_partial_download_retry_and_cancel(qtbot, tmp_path, monkeypatch):

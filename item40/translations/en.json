@@ -353,5 +353,16 @@
   "Куда сохранить эмодзи и стикеры": "Where to save emoji and stickers",
   "Получение набора Telegram…": "Loading Telegram pack…",
   "Скачивание выбранных эмодзи или стикеров…": "Downloading selected emoji or stickers…",
-  "Выберите эмодзи или стикеры для скачивания.": "Select emoji or stickers to download."
+  "Выберите эмодзи или стикеры для скачивания.": "Select emoji or stickers to download.",
+  "Скачать с {0}": "Download from {0}",
+  "Ссылка на ролик {0}": "{0} video link",
+  "Исходный поток {0}": "Original {0} stream",
+  "Скачать с TikTok": "Download from TikTok",
+  "Сохранение видео и аудио по обычной или короткой ссылке TikTok.": "Save video and audio from a regular or short TikTok link.",
+  "Вставьте ссылку на отдельный ролик TikTok или короткую ссылку vm.tiktok.com / vt.tiktok.com.": "Paste a link to an individual TikTok video or a short vm.tiktok.com / vt.tiktok.com link.",
+  "Получение списка форматов TikTok": "Loading TikTok formats",
+  "По этой ссылке не найден отдельный видеоролик TikTok.": "No individual TikTok video was found at this link.",
+  "По этой ссылке не найден видеоролик. Фотопубликации TikTok не поддерживаются.": "No video was found at this link. TikTok photo posts are not supported.",
+  "Ролик TikTok недоступен, удалён или требует входа в аккаунт.": "The TikTok video is unavailable, deleted, or requires login.",
+  "TikTok отклонил запрос или недоступен. Проверьте подключение и повторите попытку позже.": "TikTok rejected the request or is unavailable. Check your connection and try again later."
 }
